@@ -881,7 +881,7 @@
     "lr_scheduler_epochs": 2000,
     "optimizer": "Adam",
     "loss_function": "MSELoss",
-    "save_model_frequency": 1,
+    "save_model_frequency": 10,
     "update_weight_percentage": 1.0,
     "memory_size": 10000,
     "batch_size": 32,
