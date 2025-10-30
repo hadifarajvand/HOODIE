@@ -1,0 +1,10 @@
+{
+  "mean_latency": 0.0,
+  "p95_latency": 0.0,
+  "drop_rate": 0.0,
+  "throughput": 0.0,
+  "offload_ratio_cloud": 0.0,
+  "offload_ratio_edge": 0.0,
+  "avg_queue_lengths": {},
+  "peak_queue_lengths": {}
+}

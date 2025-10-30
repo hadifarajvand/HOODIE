@@ -1,0 +1,44 @@
+{
+  "scenario": {
+    "name": "baseline_smoke",
+    "hyperparameters_path": "/Users/hadi/Documents/GitHub/HOODIE/hyperparameters/hyperparameters.json",
+    "overrides": {},
+    "seeds": [
+      0
+    ],
+    "horizon": 30
+  },
+  "agent": null,
+  "baselines": [
+    {
+      "name": "flc",
+      "seed": 0,
+      "parameters": {}
+    },
+    {
+      "name": "vo",
+      "seed": 0,
+      "parameters": {}
+    },
+    {
+      "name": "ho",
+      "seed": 0,
+      "parameters": {}
+    },
+    {
+      "name": "ro",
+      "seed": 0,
+      "parameters": {}
+    },
+    {
+      "name": "bco",
+      "seed": 0,
+      "parameters": {}
+    }
+  ],
+  "output": {
+    "artifacts_root": "/Users/hadi/Documents/GitHub/HOODIE/experiments/hoodie_eval/artifacts",
+    "stamp": null,
+    "keep_raw_events": true
+  }
+}
