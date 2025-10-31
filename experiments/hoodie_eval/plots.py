@@ -3,7 +3,45 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+import json
 import matplotlib.pyplot as plt
+
+
+def plot_convergence(log_path: Path, path: Path) -> None:
+    if not log_path.exists():
+        return
+    episodes = []
+    rewards = []
+    losses = []
+    with log_path.open() as fp:
+        for line in fp:
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            episodes.append(record.get("episode", len(episodes)))
+            rewards.append(record.get("reward", 0.0))
+            losses.append(record.get("loss", 0.0))
+    if not episodes:
+        return
+    _prepare_axis()
+    fig, ax1 = plt.subplots()
+    ax1.plot(episodes, rewards, label="Reward", color="tab:blue")
+    ax1.set_xlabel("Episode")
+    ax1.set_ylabel("Reward", color="tab:blue")
+    ax1.tick_params(axis="y", labelcolor="tab:blue")
+
+    ax2 = ax1.twinx()
+    ax2.plot(episodes, losses, label="Loss", color="tab:red", alpha=0.7)
+    ax2.set_ylabel("Loss", color="tab:red")
+    ax2.tick_params(axis="y", labelcolor="tab:red")
+
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path)
+    plt.close(fig)
 
 
 def _prepare_axis() -> None:
@@ -72,24 +110,6 @@ def plot_scalability(points: Sequence[Mapping[str, float]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path)
     plt.close(fig)
-
-
-def plot_convergence(curves: Mapping[str, Iterable[float]], path: Path) -> None:
-    """Plot convergence curves (reward/loss) for HOODIE agent training."""
-
-    _prepare_axis()
-    fig, ax = plt.subplots()
-    for label, values in curves.items():
-        ax.plot(list(values), label=label)
-    ax.set_xlabel("Episode")
-    ax.set_ylabel("Value")
-    ax.set_title("Training Convergence")
-    ax.legend()
-    fig.tight_layout()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path)
-    plt.close(fig)
-
 
 def plot_ablation(points: Sequence[Mapping[str, float]], path: Path) -> None:
     """Bar plot for ablation studies toggling Double/Dueling/LSTM."""

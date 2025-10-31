@@ -26,6 +26,7 @@ class AgentConfig:
 
     name: str = "hoodie"
     episodes: int = 2000
+    evaluation_episodes: int = 5
     validate_every: int = 100
     dueling: bool = True
     double: bool = True
@@ -35,6 +36,8 @@ class AgentConfig:
     checkpoint_path: Optional[Path] = None
     hyperparameters_path: Optional[Path] = None
     overrides: Dict[str, Any] = field(default_factory=dict)
+    ablations: Sequence[Dict[str, Any]] = field(default_factory=list)
+    log_dir: Optional[Path] = None
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)
@@ -42,6 +45,9 @@ class AgentConfig:
             data["checkpoint_path"] = str(self.checkpoint_path)
         if self.hyperparameters_path is not None:
             data["hyperparameters_path"] = str(self.hyperparameters_path)
+        if self.log_dir is not None:
+            data["log_dir"] = str(self.log_dir)
+        data["ablations"] = [dict(item) for item in self.ablations]
         return data
 
 
@@ -115,6 +121,10 @@ class HoodieEvalConfig:
         systems: List[str] = []
         if self.agent is not None:
             systems.append(self.agent.name)
+            for ablation in self.agent.ablations:
+                name = ablation.get("name")
+                if name:
+                    systems.append(name)
         systems.extend(baseline.name for baseline in self.baselines)
         return systems
 
@@ -128,6 +138,12 @@ def _resolve_agent(data: MutableMapping[str, Any]) -> Optional[AgentConfig]:
     hyperparameters = _coerce_path(data.get("hyperparameters_path"))
     if hyperparameters is not None:
         data["hyperparameters_path"] = hyperparameters
+    log_dir = _coerce_path(data.get("log_dir"))
+    if log_dir is not None:
+        data["log_dir"] = log_dir
+    ablations = data.get("ablations")
+    if ablations is not None:
+        data["ablations"] = [dict(item) for item in ablations]
     return AgentConfig(**data)
 
 

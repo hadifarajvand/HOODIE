@@ -42,10 +42,15 @@ def _command_run(config_path: Path, systems: Optional[List[str]]) -> None:
 
 def _command_compare(artifacts_root: Path, systems: List[str]) -> None:
     for system in systems:
-        metrics_path = artifacts_root / system / "metrics.json"
-        if not metrics_path.exists():
+        system_dir = artifacts_root / system
+        if not system_dir.exists():
             typer.secho(f"Metrics not found for {system}", fg=typer.colors.RED)
             continue
+        candidates = list(system_dir.glob("**/metrics.json"))
+        if not candidates:
+            typer.secho(f"Metrics not found for {system}", fg=typer.colors.RED)
+            continue
+        metrics_path = candidates[0]
         data = load_metrics(metrics_path)
         load = data.get("load")
         load_segment = f", load={load:.3f}" if load is not None else ""
@@ -57,13 +62,18 @@ def _command_compare(artifacts_root: Path, systems: List[str]) -> None:
 def _command_plots(artifacts_root: Path) -> None:
     latency_points = []
     drop_points = []
-    for system_dir in artifacts_root.iterdir():
+    system_dirs = [p for p in artifacts_root.iterdir() if p.is_dir() and p.name != "plots"]
+    for system_dir in system_dirs:
         metrics_path = system_dir / "metrics.json"
         if not metrics_path.exists():
-            continue
+            candidates = list(system_dir.glob("**/metrics.json"))
+            if not candidates:
+                continue
+            metrics_path = candidates[0]
         with metrics_path.open() as fp:
             data = json.load(fp)
         load_value = data.get("load", 0.0)
+        label = system_dir.name
         latency_points.append({"label": system_dir.name, "load": load_value, "latency": data.get("mean_latency", 0.0)})
         drop_points.append({"label": system_dir.name, "load": load_value, "drop_rate": data.get("drop_rate", 0.0)})
     layout = ArtifactLayout(
@@ -74,6 +84,12 @@ def _command_plots(artifacts_root: Path) -> None:
     )
     plots.plot_latency_vs_load(latency_points, layout.plots_root / "latency_vs_load.png")
     plots.plot_drop_rate_vs_load(drop_points, layout.plots_root / "drop_rate_vs_load.png")
+    for system_dir in system_dirs:
+        candidate_logs = list(system_dir.glob("**/training_log.jsonl"))
+        for log_path in candidate_logs:
+            seed_name = log_path.parent.name
+            plot_path = layout.plots_root / f"{system_dir.name}_{seed_name}_convergence.png"
+            plots.plot_convergence(log_path, plot_path)
     typer.secho(f"Plots saved under {layout.plots_root}", fg=typer.colors.GREEN)
 
 
@@ -98,7 +114,7 @@ if typer is not None:  # pragma: no cover
 
         _command_compare(artifacts, systems)
 
-    @app.command()
+    @app.command("plots")
     def plots_command(
         artifacts: Path = typer.Option(..., "--artifacts", help="Directory containing metrics.json files."),
     ) -> None:

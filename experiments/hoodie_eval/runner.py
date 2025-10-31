@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from environment import Environment
 
@@ -11,7 +11,16 @@ from .adapters import load_hyperparameters, make_environment, seed_everything
 from .baselines import BaselinePolicy
 from .config import BaselineConfig, HoodieEvalConfig
 from .instrumentation import attach_instrumentation
-from .io import ArtifactLayout, resolve_layout, write_config_snapshot, write_events, write_metrics
+from .events import EventRecorder
+from .io import (
+    ArtifactLayout,
+    resolve_layout,
+    write_config_snapshot,
+    write_events,
+    write_metrics,
+    write_training_log,
+)
+from .trainer import train_and_evaluate_agent
 
 
 @dataclass
@@ -24,149 +33,6 @@ class RunResult:
     events: List[Dict[str, Any]] = field(default_factory=list)
     metrics_path: Optional[Path] = None
     events_path: Optional[Path] = None
-
-
-class EventRecorder:
-    """Collects task-level events during simulation for post-hoc analysis."""
-
-    def __init__(self) -> None:
-        self.events: List[Dict[str, Any]] = []
-        self._next_task_id = 0
-        self._task_metadata: Dict[int, Dict[str, Any]] = {}
-
-    def _ensure_task_id(self, task: Any) -> int:
-        if not hasattr(task, "_hoodie_id"):
-            setattr(task, "_hoodie_id", self._next_task_id)
-            self._next_task_id += 1
-        return int(getattr(task, "_hoodie_id"))
-
-    def record_arrivals(
-        self, time_step: int, tasks: Sequence[Any], server_ids: Iterable[int]
-    ) -> None:
-        for server_id, task in zip(server_ids, tasks):
-            if task is None:
-                continue
-            task_id = self._ensure_task_id(task)
-            self._task_metadata[task_id] = {
-                "arrival_time": getattr(task, "arrival_time", time_step),
-                "origin": getattr(task, "get_origin_server_id", lambda: server_id)(),
-            }
-            event = {
-                "event": "task_arrived",
-                "time": time_step,
-                "server": server_id,
-                "task_id": task_id,
-                "arrival_time": getattr(task, "arrival_time", time_step),
-                "timeout": getattr(task, "timeout_delay", None),
-                "size": getattr(task, "size", None),
-                "priority": getattr(task, "priotiry", None),
-            }
-            self.events.append(event)
-
-    def record_actions(self, time_step: int, actions: Sequence[int]) -> None:
-        self.events.append(
-            {
-                "event": "actions",
-                "time": time_step,
-                "load": sum(action is not None for action in actions) / max(len(actions), 1),
-                "actions": list(actions),
-            }
-        )
-
-    def record_info(self, time_step: int, info: Mapping[str, Any]) -> None:
-        self.events.append(
-            {
-                "event": "info",
-                "time": time_step,
-                "payload": dict(info),
-            }
-        )
-
-    def record_queue_lengths(self, env: Environment, time_step: int) -> None:
-        for server in env.servers:
-            self.events.append(
-                {
-                    "event": "queue_length",
-                    "time": time_step,
-                    "queue": f"server_{server.id}_private",
-                    "length": getattr(server.processing_queue, "queue_length", 0.0),
-                }
-            )
-            self.events.append(
-                {
-                    "event": "queue_length",
-                    "time": time_step,
-                    "queue": f"server_{server.id}_offloading",
-                    "length": getattr(server.offloading_queue, "queue_length", 0.0),
-                }
-            )
-            for origin_id, public_queue in server.public_queue_manager.public_queues.items():
-                self.events.append(
-                    {
-                        "event": "queue_length",
-                        "time": time_step,
-                        "queue": f"server_{server.id}_public_from_{origin_id}",
-                        "length": getattr(public_queue, "queue_length", 0.0),
-                    }
-                )
-        cloud_manager = env.cloud.public_queue_manager
-        for origin_id, public_queue in cloud_manager.public_queues.items():
-            self.events.append(
-                {
-                    "event": "queue_length",
-                    "time": time_step,
-                    "queue": f"cloud_public_from_{origin_id}",
-                    "length": getattr(public_queue, "queue_length", 0.0),
-                }
-            )
-
-    def record_completion(
-        self,
-        task: Any,
-        finish_time: float,
-        context: Mapping[str, Any],
-        snapshot: Mapping[str, Any],
-    ) -> None:
-        task_id = self._ensure_task_id(task)
-        metadata = self._task_metadata.get(task_id, {})
-        arrival_time = metadata.get("arrival_time", snapshot.get("arrival_time", finish_time))
-        latency = float(finish_time - arrival_time)
-        event = {
-            "event": "task_completed",
-            "task_id": task_id,
-            "time": finish_time,
-            "latency": latency,
-            "origin": snapshot.get("origin", metadata.get("origin")),
-            "target": snapshot.get("target"),
-            "destination": "cloud" if context.get("executor_type") == "cloud" else "edge",
-            "executor": context.get("server_id"),
-            "queue_type": context.get("queue_type"),
-        }
-        self.events.append(event)
-        self._task_metadata.pop(task_id, None)
-
-    def record_drop(
-        self,
-        task: Any,
-        penalty: float,
-        context: Mapping[str, Any],
-        snapshot: Mapping[str, Any],
-    ) -> None:
-        task_id = self._ensure_task_id(task)
-        queue = context.get("queue")
-        drop_time = getattr(queue, "current_time", None)
-        event = {
-            "event": "task_dropped",
-            "task_id": task_id,
-            "time": drop_time,
-            "penalty": penalty,
-            "origin": snapshot.get("origin"),
-            "target": snapshot.get("target"),
-            "destination": "cloud" if context.get("queue_type") == "cloud_public" else "edge",
-            "queue_type": context.get("queue_type"),
-        }
-        self.events.append(event)
-        self._task_metadata.pop(task_id, None)
 
 
 def _run_episode(env: Environment, policy: BaselinePolicy, recorder: EventRecorder) -> EventRecorder:
@@ -190,6 +56,22 @@ def _run_episode(env: Environment, policy: BaselinePolicy, recorder: EventRecord
 
 def _aggregate(recorder: EventRecorder, episode_time: int) -> metrics.AggregateMetrics:
     return metrics.compute_metrics(recorder.events, episode_time=episode_time)
+
+
+def _agent_variants(agent_config) -> List[Tuple[str, Dict[str, Any]]]:
+    variants: List[Tuple[str, Dict[str, Any]]] = [(agent_config.name, {})]
+    for entry in agent_config.ablations:
+        name = entry.get("name")
+        if not name:
+            continue
+        overrides: Dict[str, Any] = {}
+        for key in ("dueling", "double", "lstm", "episodes", "evaluation_episodes", "lookback_window"):
+            if key in entry:
+                overrides[key] = entry[key]
+        if "overrides" in entry:
+            overrides.setdefault("overrides", {}).update(entry["overrides"])
+        variants.append((name, overrides))
+    return variants
 
 
 def _run_baseline(
@@ -240,6 +122,41 @@ def run_experiment(config: HoodieEvalConfig) -> List[RunResult]:
             results.extend(_run_baseline(config, baseline, hyperparameters, layout))
 
     # Agent execution is more involved (training + evaluation) and is implemented
-    # in a follow-up iteration.
+    if config.agent:
+        variants = _agent_variants(config.agent)
+        for seed in config.scenario.seeds:
+            for variant_name, variant_overrides in variants:
+                result = train_and_evaluate_agent(
+                    config.agent,
+                    hyperparameters,
+                    layout,
+                    seed,
+                    variant_name,
+                    variant_overrides,
+                )
+                write_metrics(result.metrics.to_dict(), result.metrics_path)
+                write_events(result.events, result.events_path)
+                write_training_log(
+                    [
+                        {
+                            "episode": entry.episode,
+                            "reward": entry.reward,
+                            "epsilon": entry.epsilon,
+                            "loss": entry.loss,
+                        }
+                        for entry in result.log
+                    ],
+                    layout.training_log_path(result.system_name, result.seed),
+                )
+                results.append(
+                    RunResult(
+                        system=result.system_name,
+                        seed=result.seed,
+                        metrics=result.metrics,
+                        events=result.events,
+                        metrics_path=result.metrics_path,
+                        events_path=result.events_path,
+                    )
+                )
 
     return results

@@ -171,7 +171,7 @@ def build_agent(
     return agent
 
 
-def build_baseline(baseline: BaselineConfig, env: Environment) -> Any:
+def build_baseline(baseline: BaselineConfig, env: Environment, server_id: int) -> Any:
     """
     Instantiate one of the lightweight baseline policies.
 
@@ -180,7 +180,7 @@ def build_baseline(baseline: BaselineConfig, env: Environment) -> Any:
     """
 
     name = baseline.name.lower()
-    state_dimensions, foreign_queues, number_of_actions = env.get_server_dimensions(0)
+    state_dimensions, foreign_queues, number_of_actions = env.get_server_dimensions(server_id)
 
     if name in {"flc", "all_local", "local"}:
         return AllLocal()
@@ -192,9 +192,9 @@ def build_baseline(baseline: BaselineConfig, env: Environment) -> Any:
         return Random(number_of_actions=number_of_actions)
     if name in {"bco", "round_robin"}:
         return RoundRobin(number_of_actions=number_of_actions)
-    if name in {"mleo", "rule_based"} and RuleBased is not None:
-        local_cpu = env.servers[0].private_queue_computational_capacity
-        foreign_cpus = env.get_foreign_cpus(0)
+    if name in {"rule_based"} and RuleBased is not None:
+        local_cpu = env.servers[server_id].private_queue_computational_capacity
+        foreign_cpus = env.get_foreign_cpus(server_id)
         return RuleBased(
             number_of_actions=number_of_actions,
             local_cpu=local_cpu,

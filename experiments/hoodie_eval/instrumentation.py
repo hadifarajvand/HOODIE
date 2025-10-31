@@ -7,7 +7,7 @@ from environment.task import Task
 
 if TYPE_CHECKING:  # pragma: no cover
     from environment.environment import Environment
-    from .runner import EventRecorder
+    from .events import EventRecorder
 
 _CONTEXT_STACK: List[Dict[str, Any]] = []
 _RECORDER: Optional["EventRecorder"] = None

@@ -52,6 +52,9 @@ class ArtifactLayout:
     def events_path(self, system: str, seed: Optional[int] = None) -> Path:
         return self.system_root(system, seed) / "events.parquet"
 
+    def training_log_path(self, system: str, seed: Optional[int] = None) -> Path:
+        return self.system_root(system, seed) / "training_log.jsonl"
+
 
 def resolve_layout(
     output: OutputConfig, scenario: ScenarioConfig, stamp: Optional[str] = None
@@ -121,3 +124,12 @@ def load_metrics(path: Path) -> Mapping[str, Any]:
     """Load metrics JSON into memory."""
 
     return json.loads(path.read_text())
+
+
+def write_training_log(records: Sequence[Mapping[str, Any]], path: Path) -> None:
+    """Persist training telemetry as JSON lines."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as fp:
+        for record in records:
+            fp.write(json.dumps(record) + "\n")
