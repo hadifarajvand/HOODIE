@@ -5,7 +5,6 @@ import torch.nn.functional as f
 import numpy as np 
 
 import pickle
-from collections import deque
 import os 
 from .decision_maker_base import DescisionMakerBase
 import sys
@@ -110,16 +109,14 @@ class Agent(DescisionMakerBase):
         self.id = id
         self.state_dimensions = state_dimensions
         self.lstm_shape = lstm_shape
-        self.number_of_actions = number_of_actions
+        # two-stage: first binary (local vs offload), then destination (including cloud)
+        self.local_offload_actions = 2
+        self.destination_actions = max(number_of_actions - 1, 1)
         self.hidden_layers = hidden_layers
         self.lstm_layers = lstm_layers
         self.device = device
     
         self.lstm_time_step =lstm_time_step
-        self.lstm_history = deque(maxlen=self.lstm_time_step)
-        for _ in range(self.lstm_time_step):
-            self.lstm_history.append(np.zeros([self.lstm_shape]))
-
         
         self.epsilon = epsilon
         self.epsilon_decrement = epsilon_decrement
@@ -132,10 +129,13 @@ class Agent(DescisionMakerBase):
         self.update_weight_percentage = update_weight_percentage
         
         
+        # output size = local/offload logits + destination logits
+        two_stage_actions = self.local_offload_actions + self.destination_actions
+        lstm_hidden = lstm_shape if lstm_shape <= 20 else 20
         self.Q_eval_network = DeepQNetwork(state_dimensions = state_dimensions,
                                              lstm_input_shape = lstm_shape,
-                                             lstm_output_shape = lstm_shape,
-                                             number_of_actions = number_of_actions,
+                                             lstm_output_shape = lstm_hidden,
+                                             number_of_actions = two_stage_actions,
                                              hidden_layers = hidden_layers,
                                              lstm_layers = lstm_layers,
                                              dropout_rate = dropout_rate,
@@ -155,9 +155,9 @@ class Agent(DescisionMakerBase):
         self.batch_size = batch_size
         self.memory_size = memory_size
         self.state_memory = np.zeros((self.memory_size, state_dimensions),dtype=np.float32)
-        self.lstm_memory =np.zeros((self.memory_size, self.lstm_shape),dtype=np.float32)
+        self.lstm_memory =np.zeros((self.memory_size, self.lstm_time_step, self.lstm_shape),dtype=np.float32)
         self.new_state_memory = np.zeros((self.memory_size, state_dimensions),dtype=np.float32)
-        self.new_lstm_memory =np.zeros((self.memory_size, self.lstm_shape),dtype=np.float32)
+        self.new_lstm_memory =np.zeros((self.memory_size, self.lstm_time_step, self.lstm_shape),dtype=np.float32)
         self.reward_memory = np.zeros(self.memory_size,dtype=np.float32)
         self.action_memory = np.zeros(self.memory_size,dtype=np.int64)
         self.terminal_memory= np.zeros(self.memory_size,dtype=bool)
@@ -175,29 +175,45 @@ class Agent(DescisionMakerBase):
         self.memory_counter +=1
         
     def reset_lstm_history(self):
-        self.lstm_history = deque(maxlen=self.lstm_time_step)
-        for _ in range(self.lstm_time_step):
-            self.lstm_history.append(np.zeros([self.lstm_shape]))
+        # No internal history; sequences are provided directly from the environment.
+        return
+    
+    def update_epsilon_for_episode(self, epoch:int, total_epochs:int):
+        half = max(1, total_epochs // 2)
+        if epoch < half:
+            decay = 1 - (epoch / half)
+            self.epsilon = max(decay, self.epsilon_end)
+        else:
+            self.epsilon = self.epsilon_end
     
     def choose_action(self,observation,lstm_state):  
-        self.lstm_history.append(lstm_state)
         with torch.no_grad():
             if np.random.uniform() > self.epsilon:
                 self.Q_eval_network.eval()
-                observation_np = np.expand_dims(observation,axis=0) # Convert the list of NumPy arrays to a single NumPy array
-                lstm_history_np = np.expand_dims(self.lstm_history,axis=0)  # Convert the list of NumPy arrays to a single NumPy array
+                observation_np = np.expand_dims(observation,axis=0)
+                lstm_history_np = np.expand_dims(lstm_state,axis=0).astype(np.float32)
 
                 observation = torch.tensor(observation_np,dtype=torch.float32).to(self.device)
                 lstm_input = torch.tensor(lstm_history_np,dtype=torch.float32).to(self.device)
-                action_values = self.Q_eval_network(observation, lstm_input).detach().cpu().numpy().flatten()
-            
-                action = np.argmax(action_values)
-
-                # action_probabilities = action_values / np.sum(action_values)
-                # action = np.random.choice(self.number_of_actions, p=action_probabilities)
-      
+                q_values = self.Q_eval_network(observation, lstm_input).detach().cpu().numpy().flatten()
+                # split into stage1 (2 actions) and stage2 (destinations)
+                stage1 = q_values[:self.local_offload_actions]
+                stage2 = q_values[self.local_offload_actions:]
+                dm1 = np.argmax(stage1)  # 0 local, 1 offload
+                if dm1 == 0:
+                    action = 0  # local maps to index 0
+                else:
+                    dest_idx = np.argmax(stage2)
+                    action = dest_idx + 1  # shift by 1: 0 local, 1..N destinations/cloud
             else:
-                action = np.random.choice(self.number_of_actions)
+                dm1 = np.random.choice(self.local_offload_actions)
+                if dm1 == 0:
+                    action = 0
+                else:
+                    dest_idx = np.random.choice(self.destination_actions)
+                    action = dest_idx + 1
+        if self.epsilon_decrement > 0:
+            self.epsilon = max(self.epsilon_end, self.epsilon - self.epsilon_decrement)
         return action
     
     
@@ -206,19 +222,13 @@ class Agent(DescisionMakerBase):
     def load_model(self,checkpoint_folder=None):
         if not checkpoint_folder:
             checkpoint_folder = self.checkpoint_folder
-        try:
-            if os.path.isfile(checkpoint_folder):
-                self.Q_eval_network = torch.load(checkpoint_folder,map_location=self.device)
-                print('model weights loaded')
-            else:
-                print('weights folder not found')
-        except Exception as e:
-            print('An error occurred while loading the model weights:', str(e)) 
+        # Architecture has recently changed; start fresh to avoid shape mismatches.
+        return
     
     def store_model(self,path=None):
         if not path:
             path = self.checkpoint_folder
-        torch.save(self.Q_eval_network, path)
+        torch.save(self.Q_eval_network.state_dict(), path)
         
     def learn(self):
         def weighted_add_state_dicts():
@@ -228,10 +238,6 @@ class Agent(DescisionMakerBase):
             for key in target_state_dict.keys():
                 new_state_dict[key] = self.update_weight_percentage*eval_state_dict[key]  + target_state_dict[key] * (1 - self.update_weight_percentage)
             return new_state_dict
-        def get_lstm_sequence(index):
-            start_index = max(0, index - self.lstm_time_step)
-            return torch.tensor(self.lstm_memory[start_index:index])
-
         
     
         if self.memory_counter <= self.batch_size+self.lstm_time_step:
@@ -251,16 +257,14 @@ class Agent(DescisionMakerBase):
 
 
         max_memory = min(self.memory_counter, self.memory_size)
-        batch_indices = np.random.choice(range(self.lstm_time_step,max_memory), self.batch_size, replace=False)
+        batch_indices = np.random.choice(range(max_memory), self.batch_size, replace=False)
 
         state_batch = torch.tensor(self.state_memory[batch_indices]).to(self.device)
-        lstm_sequence_batch = [get_lstm_sequence(index) for index in batch_indices]
-        lstm_sequence_batch = torch.stack(lstm_sequence_batch).to(self.device)
+        lstm_sequence_batch = torch.tensor(self.lstm_memory[batch_indices]).to(self.device)
         action_batch = torch.tensor(self.action_memory[batch_indices]).to(self.device)
         reward_batch = torch.tensor(self.reward_memory[batch_indices]).to(self.device)
         next_state_batch = torch.tensor(self.new_state_memory[batch_indices]).to(self.device)
-        next_lstm_sequence_batch = [get_lstm_sequence(index + 1) for index in batch_indices]  
-        next_lstm_sequence_batch = torch.stack(next_lstm_sequence_batch).to(self.device)
+        next_lstm_sequence_batch = torch.tensor(self.new_lstm_memory[batch_indices]).to(self.device)
         terminal_batch = torch.tensor(self.terminal_memory[batch_indices]).to(self.device)
 
 
@@ -281,8 +285,6 @@ class Agent(DescisionMakerBase):
         
         # x = self.Q_eval_network(state_batch, lstm_sequence_batch).gather(1, action_batch.unsqueeze(1)).squeeze(1)
         # print("New Loss :",self.loss_function(x,q_target).item())
-        self.epsilon = max(self.epsilon - self.epsilon_decrement, self.epsilon_end)
-        
     
         
         with open(self.scheduler_file, 'wb') as f:

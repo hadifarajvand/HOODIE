@@ -32,6 +32,7 @@ class Task():
     
     def finish_task(self,
                     finish_time:int) ->int:
+        self.remain = 0
         self.empty = True
         return finish_time- self.arrival_time
     
@@ -81,7 +82,7 @@ class Task():
         return self.timeout_instance
     def get_remaining_size(self):
         assert not self.empty
-        return self.remain
+        return max(self.remain, 0)
     
     def get_density(self):
         assert not self.empty
@@ -98,6 +99,9 @@ class Task():
     def get_origin_server_id(self):
         assert not self.empty
         return self.origin_server_id
+    def get_arrival_time(self):
+        assert not self.empty
+        return self.arrival_time
     
     def set_origin_server_id(self,origin_server_id):
         assert not self.empty
@@ -118,7 +122,12 @@ class Task():
                     target_server_id = self.target_server_id)
         
     def get_features(self):
-        return np.array([self.size])
+        return np.array([
+            self.size,
+            self.priotiry,
+            self.timeout_delay,
+            self.computational_density
+        ], dtype=np.float32)
     def get_number_of_features(self):
         features =  self.get_features()
         return len(features)

@@ -1,0 +1,17 @@
+Code and paper both target distributed, single-hop edge/cloud offloading with DRL agents, but the implementation only partially follows the workflow described in HOODIE_paper_ocr.txt.
+
+Where it aligns
+
+Each server has its own agent choosing among local compute, horizontal offload, or cloud per the adjacency matrix (environment/server.py (line 43), environment/matchmaker.py (line 12)).
+Offloading/public queue structure returns delay/drop costs to the task’s origin, matching the paper’s single-hop cost accounting (environment/server.py (line 53), environment/task.py (line 28), environment/environment.py (line 193)).
+The agent model supports dueling heads, double-DQN targets, replay memory, and optional LSTM over a history vector (decision_makers/agent.py (line 19), decision_makers/agent.py (line 243)).
+Rewards are negated costs (delay or drop penalties), so the agents are trained to minimize latency/drops (environment/environment.py (line 209), environment/task.py (line 28)).
+Where it diverges from the paper’s workflow
+
+State vector lacks the load-history matrix L(t) and its LSTM-based forecast; it only contains task size, two waiting times, and counts of this server’s tasks in public queues (environment/environment.py (line 128)). Default hyperparameters disable LSTM entirely (hyperparameters/hyperparameters.json), so the proactive load prediction in the paper is absent.
+Training loop is much lighter: experience is collected for a full episode and each agent calls learn() once at the end (main.py (line 133)). Epsilon is dropped by a fixed 100 on each learn, effectively forcing immediate exploitation (decision_makers/agent.py (line 284)), unlike the paper’s gradual ε-greedy schedule and per-time-slot updates.
+Rewards are aggregated over any task that finishes/drops in a step and are normalized by the max drop penalty, with no NaN case for “no arrival” (environment/environment.py (line 209)), whereas the paper ties the reward to each arriving task with a fixed penalty C when dropped.
+Queue dynamics differ from the paper’s formulas: waiting times are approximated from size/capacity rather than max completion time of prior tasks (environment/queues.py (line 63), environment/queues.py (line 94)), and public CPU is split by current head-task priorities, not evenly across active queues.
+No EC/pub-sub communication or recovery mechanism is modeled; the environment centrally injects active-queue counts each step, so delayed/missing load messages discussed in the paper aren’t simulated (environment/environment.py (line 128)).
+Default parameters deviate from the paper’s experiments (e.g., lstm_layers 0, epsilon_decrement 100, connection capacities of 0/1/3 instead of the 10–40 Mbps ranges), so even with matching logic the outcomes would not mirror the figures (hyperparameters/hyperparameters.json).
+Bottom line: the code captures the high-level idea of decentralized offloading with double/dueling DQN agents, but it omits the paper’s load-forecasting state, per-slot training cadence, and communication/recovery workflow, so it does not simulate the exact HOODIE algorithm as described. Next steps, if you want a closer reproduction, would be to (1) add the L(t)/LSTM load forecast into the state, (2) move learning/target updates into the time-step loop with a sane ε decay, and (3) mirror the queue/communication mechanics and parameter settings used in the paper.

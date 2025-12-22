@@ -6,7 +6,8 @@ import argparse
 import torch
 import os
 import json
-import pickle 
+import pickle
+import matplotlib.pyplot as plt
 def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     parser = argparse.ArgumentParser()
@@ -14,6 +15,7 @@ def main():
     parser.add_argument('--hyperparameters_file', type=str, default='hyperparameters/hyperparameters.json', help='Path to the hyperparameters file')
     parser.add_argument('--epochs', type=int, default=2, help='Device to use')
     parser.add_argument('--validate', type=bool, default=False, help='Device to use')
+    parser.add_argument('--plot', action='store_true', help='Save KPI plots to log folder')
     args  = parser.parse_args()
 
     os.makedirs(args.log_folder, exist_ok=True)
@@ -44,7 +46,13 @@ def main():
         computational_density_distributions=hyperparameters['computational_density_distributions'],
         drop_penalty_mins=hyperparameters['drop_penalty_mins'],
         drop_penalty_maxs=hyperparameters['drop_penalty_maxs'],
-        drop_penalty_distributions=hyperparameters['drop_penalty_distributions']
+        drop_penalty_distributions=hyperparameters['drop_penalty_distributions'],
+        horizontal_rate=hyperparameters['horizontal_rate'],
+        vertical_rate=hyperparameters['vertical_rate'],
+        slot_duration=hyperparameters['slot_duration'],
+        delay_prob=hyperparameters['delay_prob'],
+        max_delay=hyperparameters['max_delay'],
+        lookback_window=hyperparameters['lstm_time_step']
     )
     
     
@@ -115,10 +123,16 @@ def main():
         
         if hyperparameters['decision_makers'] == 'rule_based':
             foreign_cpus = env.get_foreign_cpus(i)
+            possible_actions = env.matchmakers[i].get_rows()
             decision_maker_params = {
                 'number_of_actions': number_of_actions,
                 'local_cpu': hyperparameters['private_cpu_capacities'][i],
-                'foreign_cpus':foreign_cpus
+                'foreign_cpus':foreign_cpus,
+                'possible_actions': possible_actions,
+                'task_feature_len': env.get_task_feature_count(),
+                'size_max': hyperparameters['task_size_maxs'][i],
+                'timeout_max': hyperparameters['timeout_delay_maxs'][i],
+                'density_max': hyperparameters['computational_density_maxs'][i]
             }
         
     
@@ -130,34 +144,68 @@ def main():
     for key in hyperparameters:
         if key != 'connection_matrix':
             print(key ," : ",hyperparameters[key])
-    for epoch in range(args.epochs):
+    total_epochs = args.epochs
+    kpi_history = []
+    for epoch in range(total_epochs):
         accumulated_rewards = []
         observations,done, info = env.reset()
-        local_observations,public_queues =observations
+        local_observations,load_history_matrix =observations
+        last_kpi = None
         while not done:
             actions = np.zeros(number_of_servers, dtype=int)
             for i in range(number_of_servers):
-                actions[i] = decision_makers[i].choose_action(local_observations[i],public_queues[i])
+                actions[i] = decision_makers[i].choose_action(local_observations[i],load_history_matrix)
             observations,rewards,done,info = env.step(actions)
-            local_observations_,public_queues_ =observations
+            local_observations_,load_history_matrix_ =observations
             if not args.validate:
                 for i in range(number_of_servers):
+                        if np.isnan(rewards[i]):
+                            continue
                         decision_makers[i].store_transitions(state = local_observations[i],
-                                                    lstm_state=public_queues[i],
-                                                    action = actions[i],
-                                                    reward= rewards[i],
-                                                    new_state=local_observations_[i],
-                                                    new_lstm_state=public_queues_[i],
-                                                    done=done)
+                                                        lstm_state=load_history_matrix,
+                                                        action = actions[i],
+                                                        reward= rewards[i],
+                                                        new_state=local_observations_[i],
+                                                        new_lstm_state=load_history_matrix_,
+                                                        done=done)
+                        decision_makers[i].learn()
                         
-            local_observations,public_queues  = local_observations_,public_queues_
-            accumulated_rewards.append(sum(rewards))
+            local_observations,load_history_matrix  = local_observations_,load_history_matrix_
+            accumulated_rewards.append(np.nansum(rewards))
+            last_kpi = info.get("kpi")
         
-        print(f'Epoch {epoch} Accumulated rewards: {sum(accumulated_rewards)/len(accumulated_rewards)}')
-        if not args.validate:
-            for decision_maker in decision_makers:
-                decision_maker.learn() 
-                decision_maker.reset_lstm_history()
+        avg_reward = sum(accumulated_rewards)/len(accumulated_rewards)
+        print(f'Epoch {epoch} Accumulated rewards: {avg_reward}')
+        if last_kpi:
+            print("KPI: processed={}, dropped={}, avg_delay={}".format(
+                last_kpi.get('processed'),
+                last_kpi.get('dropped'),
+                last_kpi.get('avg_delay')))
+            kpi_history.append(last_kpi)
+        for decision_maker in decision_makers:
+            decision_maker.reset_lstm_history()
+    if args.plot and kpi_history:
+        processed = [k['processed'] for k in kpi_history]
+        dropped = [k['dropped'] for k in kpi_history]
+        delays = [k['avg_delay'] for k in kpi_history]
+        epochs = list(range(len(kpi_history)))
+        fig, axs = plt.subplots(3,1, figsize=(8,9))
+        axs[0].plot(epochs, processed, label='Processed')
+        axs[0].set_ylabel('Processed')
+        axs[0].grid(True, linestyle='--', alpha=0.5)
+        axs[1].plot(epochs, dropped, label='Dropped', color='r')
+        axs[1].set_ylabel('Dropped')
+        axs[1].grid(True, linestyle='--', alpha=0.5)
+        axs[2].plot(epochs, delays, label='Avg Delay', color='g')
+        axs[2].set_ylabel('Avg Delay')
+        axs[2].set_xlabel('Epoch')
+        axs[2].grid(True, linestyle='--', alpha=0.5)
+        for ax in axs:
+            ax.legend()
+        plt.tight_layout()
+        plot_path = os.path.join(args.log_folder, 'kpi.png')
+        plt.savefig(plot_path)
+        print(f'KPI plot saved to {plot_path}')
 
                                 
                     

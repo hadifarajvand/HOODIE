@@ -1,0 +1,1547 @@
+OJ Logo
+HOODIE: Hybrid Computation
+Offloading via Distributed Deep
+Reinforcement Learning in
+Delay-aware Cloud-Edge Continuum
+ANASTASIOS GIANNOPOULOS' (Member, IEEE), ILIAS PARALIKAS?, SOTIRIOS
+SPANTIDEAS', AND PANAGIOTIS TRAKADAS"
+‘Department of Ports Management and Shipping, National and Kapodistrian University of Athens, Psachna, Evia, P.C. 34400, Greece
+Research & Development Department, Four Dot Infinity, Chalandri, Athens, P.C. 15231, Greece
+‘CORRESPONDING AUTHOR: ANASTASIOS GIANNOPOULOS (e-mail: angianno@uoa.gr).
+ABSTRACT Cloud-Edge Computing Continuum (CEC) system, where edge and cloud nodes are
+seamlessly connected, is dedicated to handle substantial computational loads offloaded by end-users. These
+tasks can suffer from delays or be dropped entirely when deadlines are missed, particularly under fluctuating
+network conditions and resource limitations. The CEC is coupled with the need for hybrid task offloading,
+where the task placement decisions concern whether the tasks are processed locally, offloaded vertically
+to the cloud, or horizontally to interconnected edge servers. In this paper, we present a distributed hybrid
+task offloading scheme (HOODIE) designed to jointly optimize the tasks latency and drop rate, under
+dynamic CEC traffic. HOODIE employs a model-free deep reinforcement learning (DRL) framework,
+where distributed DRL agents at each edge server autonomously determine offloading decisions without
+global task distribution awareness. To further enhance the system pro-activity and learning stability, we
+incorporate techniques such as Long Short-term Memory (LSTM), Dueling deep Q-networks (DQN), and
+double-DQN. Extensive simulation results demonstrate that HOODIE effectively reduces task drop rates
+and average task processing delays, outperforming several baseline methods under changing CEC settings
+and dynamic conditions.
+INDEX TERMS Cloud computing, cloud-edge continuum, cognitive network, deep reinforcement learning,
+edge computing, internet of things, task offloading.
+۱ INTRODUCTION accommodating the increasing demands of modern appli-
+T Cloud-Edge Computing Continuum (CEC) repre- cations such as Internet of Things (IoT), smart cities, and
+sents a distributed synergistic computing paradigm that _ cognitive autonomous systems [3]. The primary advantages
+integrates cloud computing resources with edge computing of the CEC include reduced latency, improved bandwidth
+resources to offer a unified, seamless computational en- efficiency, and the ability to support real-time applications.
+vironment for the underlying end-devices [1]. Given that By processing data at the edge, CEC reduces the need for
+user equipment is battery-sensitive and resource-constrained, data to traverse the network to central cloud servers, which
+the CEC is designed to support a wide range of applica- in turn minimizes latency and enhances the user experience.
+tions by leveraging the combined capabilities of centralized This paradigm allows for the dynamic multi-scale allocation
+cloud data centers and decentralized edge nodes, offering of resources across the continuum, optimizing both latency-
+computational capacities closer to the data source and end- _ sensitive and computation-intensive tasks through intelligent
+users [2]. By seamlessly integrating Cloud-Edge layers, task distribution and resource management strategies.
+the CEC enables more responsive and scalable services,
+
+Giannopoulos e al: HOODIE: Hybrid Computation Otoadng via Distributed Deep Reinforcement Learning in Delay-aware Cloud-Edge Continuum
+
+Despite its advantages, the CEC introduces several chal- _ manage task execution within certain latency bounds, it falls,
+lenges, particularly in the context of task handling and load short in fully leveraging the potential of the CEC [5]. To
+balancing. One of the key challenges is the heterogeneity of overcome these limitations, there is a growing need for a
+computational resources and the load dynamics across the more flexible approach, referred as hybrid task offloading,
+CEC, which can lead to complex decision-making processes This approach allows tasks to be dynamically transferred
+when determining where to offload tasks. Additionally, not only vertically but also horizontally across edge nodes,
+the dynamic and distributed nature of edge environments ensuring more balanced resource utilization and reducing
+makes it difficult to predict resource availability and network the likelihood of overloading any single node. Enabling
+conditions, further complicating task scheduling and load — hybrid task flows is particularly beneficial in practical CEC
+balancing [4] considerations, where multiple edge nodes have varying
+
+Furthermore, the CEC environment demands beyond levels of computational power and network connectivity [8]
+verticalized” task offloading (from Edge to Cloud), im- Hybrid task offloading in the CEC can be significantly
+posing the need for shifting towards a hybrid (vertical enhanced by the use of distributed Machine Learning (ML)
+and horizontal/peer-to-peer) task offloading [1]. This hybrid agents. These agents can make autonomous ML-driven of
+approach, enabled by the seamless connectivity within the floading decisions by continuously learning from the CEC
+CEC, allows tasks ‏ما‎ flow not just vertically to the Cloud, environment. As opposed to centralized ML, distributed
+but also horizontally across different Edge nodes. This agents require low-size state/action space representation, as
+flexibility introduces new dimensions to the task offloading they can operate autonomously at different nodes within
+problem, requiring the development of more sophisticated, the CEC, adapting to local conditions while contributing to
+distributed and collaborative strategies that can dynamically global optimization. By leveraging techniques such as Deep
+adapt to varying network conditions, resource availability, Reinforcement Learning (DRL) [9], distributed agents can
+and application requirements. The complexity of managing deal with the non-convexity of the task offloading problem,
+both vertical and horizontal task flows necessitates a recon- dynamically adjusting their strategies to minimize delays,
+sideration of traditional task offloading models, which were and prevent task drops.
+primarily designed for simpler, vertically-oriented systems
+[5]. These challenges are exacerbated by the need to 0۵۵ ‏و‎ RELATED WORK
+strict latency requirements and to manage limited resources Tj subsection summarizes the outcomes of existing studies
+and load dynamics at both Edge and Cloud. addressing the task offloading problem, categorizing them
+
+in heuristic methods, centralized learning and distributed
+
+A. TOWARDS HYBRID TASK OFFLOADING AND learning algorithms.
+DISTRIBUTED ML
+In the context of CEC, task offloading involves dynamically
+deciding whether to process tasks locally at the edge, offload 1) Heuristic Methods
+them to another edge node (horizontal offloading) or to a Heuristic algorithms have been widely explored in the
+cloud server (vertical offloading), under time-varying task context of task offloading, with most studies focusing in
+arrival traffic. The primary goal of task offloading is ‏ما‎ MEC, and limited studies in fog-cloud environments. These
+optimize system performance by minimizing target indica- algorithms often focus on finding near-optimal solutions
+tors, such as latency, energy consumption, and task drop by simplifying the complex task offloading environment,
+ratio, to prevent bottlenecks and ensure smooth and efficient and relaxing the constraints of the non-convex optimization
+flow of CEC operations, As an optimization problem, task For instance, Wang et al, [10] proposed a heuristic-based
+offloading is constrained by several factors, including limited algorithm for minimizing energy consumption in MEC by
+computational resources at the Edge, bandwidth limitations, intelligently offloading tasks based on the current load and
+and strict latency requirements. These constraints often lead available resources. Similarly, Sardelliti et al. [11] developed
+to non-convexity of the optimization objective, where the a joint optimization algorithm for radio and computational
+goal is to minimize the overall task completion delay or drop resources, which relies on heuristic methods to balance
+rate while ensuring that tasks meet their deadlines. The non- the computational load across the edge and cloud. Other
+convexity arises from the interdependent nature of offloading approaches have also focused on specific metrics such as
+decisions, where the optimal choice for one task depends latency and energy efficiency. Mao et al. [12] introduced a
+on the offloading decisions of other tasks, as well as the — heuristic task offloading algorithm aimed at minimizing the
+dynamic state of network resources and conditions [6] total task completion time by dynamically adjusting the of-
+
+Traditionally, task offloading in CEC has been predomi-  floading strategy based on real-time network conditions. You
+nantly "verticalized,” where tasks are offloaded directly from et al. [13] presented an energy-efficient resource allocation
+users to nearby Mobile Edge Computing (MEC) servers, and strategy for mobile-edge computation offloading that utilizes,
+if these servers are overloaded, the tasks are further offloaded heuristic optimization to reduce the computational burden on
+to the Cloud for processing [7]. While this approach can edge devices.
+2 ‏سم‎
+
+OJ Logo
+TABLE 1. Acronyms resource over-distribution based on resource reservation in
+[Acronym (Meaning) MEEC. Another notable work is the DRL-based offloading
+۳" ۳ Vale let framework by Wang et al. [16], which focuses on meta-
+Bco Ballanced Cyclic OMoader learning for fast policy convergence to minimize application
+a ars Eres Ua latency in MEC. Their approach demonstrates the potential
+pa ۳ of centralized ML models to handle complex offloading sce-
+DM ۳ narios under changing environment. The AutoScale method
+DOL Deep QeLeanaing [17], [18] proposes an RL method to optimally select the
+DON Deep Q-Network execution target for model inference ‏ما‎ minimize energy
+DRL ‏وج‎ Reinforcenear bearing consumption, while also penalizing for accuracy losses due
+7 apn to quantization at the target. It considers different types co-
+EC ghar processors, given the characteristics of the neural model. The
+0 Fis in Fist Ont authors in [19] propose a DRL-based dynamic framework
+Fc ‏موی ی نع‎ considering the 56 CEC, where deep neural networks are
+HO Horizontal Otfoader used to predict the optimal task offloading strategies based on
+HOODIE Hybrid Computation Offloading via real-time system metrics, optimizing the energy consumption
+Distibuted Deep Reinforcement Leaning | Of 5G applications. There are also works 20] studying the
+in Delay-aware Cloud-Edge Continuum optimal service function chaining by considering offloading
+Db Identifier decisions in the CEC for fluid task distribution, as well as
+lor Internet of Things Kubemetes-based scheduling for price cost minimization and
+ist Lone Short-Term Memory service relocation [21].
+MEC Mobile Edge Computing Despite their advantages, centralized ML approaches face
+ML Machine Learning scalability limitations, as the central model must handle a
+MLEO Minimum Latency Estimation Offtoader large number of edge devices and tasks, leading to potential
+MSE Mean Squared Error bottlenecks. Given the centralization of data collection that
+PubeSub Publisher Subscriber Protocol is required, centralized ML may also exhibit pronounced
+ReLU Rectified Linear Unit security concerns and bandwidth overhead. Additionally,
+RO Random Offoader these methods often assume that the central model produce
+TRL Tabular Reinforcement Learning accurate decisions for each distributed node that handles,
+vo ۳ not offering any level of personalized learning on the local
+task traffic. Moreover, centralized models typically lack the
+flexibility to adapt to hybrid offloading scenarios involving
+While these heuristic algorithms provide significant in- both vertical and horizontal task flows, thereby limiting their
+sights and performance improvements, they often fall short &ffectiveness in inter-connected CEC environments.
+in addressing the dynamic and highly variable nature of CEC
+environments. Given that heuristic methods often require
+iterative-based algorithms of polynomial (or higher) com- 3) Distributed ML Methods
+plexity to derive solutions, their applicability in the online jy, response to the limitations of centralized approaches,
+network operation is questionable. The main limitations in- _gistributed ML involve deploying ML models across multiple
+clude ۵ lack of adaptability to changing network conditions, edge nodes, allowing each node to make local decisions
+inability to operate in large-scale networks such that of CEC, while also collaborating with other nodes to optimize global
+and reliance on predefined rules or approximations that may performance. For example, He et al. [22] developed a fed-
+not generalize well across different scenarios, erated leaming-based approach for edge computing, where
+agents train local models and periodically aggregate them to
+create a global model. This method enables task offloading
+2) Centralized ML Methods decisions that are both privacy-preserving and adaptive to
+Centralized ML approaches have also been extensively re- local conditions. In another study, Tang et al. [23] pro-
+searched to tackle the task offloading problem in MEC. posed a distributed DRL framework where mobile devices
+‘These methods typically involve taining a central model to independently learn optimal offloading strategies to locally
+predict optimal decisions based on historical data or real-time compute tasks or vertically offload them to edge servers
+global inputs from all individual nodes. For instance, Chen et Another study [24] introduces a DRL-based distributed task
+al. [14] proposed a DRL-based framework for dynamic task offloading framework aimed at balancing task execution
+offloading, which trains a central DRL agent to optimize between edge servers and cloud resources for efficient use of
+task allocation in MEC. Similarly, Li et al. [15] introduced computational resources across the edge-cloud continuum, In
+a centralized DRL approach for task offloading to avoid another work [25], the authors propose an offloading scheme
+‏سم‎ 1
+
+Giannopoulos et al: HOODIE: Hybrid Computation ‏ودقهه ال‎ via Distributed Deep Reinforcement Learning in Delay-aware Cloud-Edge Continuum
+where the agents learn to cooperate by exchanging infor- be efficiently managed to support latency-sensitive and
+mation about their local states, aiming to better distribute resource-intensive applications of the end-devices.
+the tasks and reduce the delays from bottlenecks. Similarly, ¢ HOODIE algorithm is fully aligned with CEC prin-
+other works presented a collaborative leaning approach that ciples to jointly minimize task latency and drop rate,
+leverages edge-cloud synergy to offload tasks from end- supporting both vertical (edge-to-cloud) and horizontal
+devices either to edge or cloud nodes in real-time [26], [27] (edge-to-edge) task flows. This is achieved by enabling
+Despite advancements, existing distributed ML approaches dual functionality at each agent (i.e. each agent may
+also present limitations, mainly that many of these models serve either as local task processor or as host for of-
+do not fully align with the CEC principles, particularly floaded tasks). This hybrid model significantly enhances
+in supporting hybrid task flows that involve both vertical resource utilization and avoids bottlenecks.
+and horizontal offloading. Most existing distributed ML The proposed scheme enforces autonomy in the dis-
+approaches focus primarily on either IoT-to-cloud, IoT-to- tributed decision-making, with each agent not knowing
+edge offloading, or edge-to-cloud (vertical) collaboration. the decisions of the other agents. In this context,
+This lack of hybrid task flow support can lead to suboptimal HOODIES facilitates the process for removing old or
+resource utilization and increased latency in more complex adding new agents in CEC.
+CEC scenarios. Additionally, federated learning models often ¢ HOODIE agents exploit the Double and Dueling DRL
+require frequent communication between nodes to synchro- techniques for learning stability [29]. To proactively
+nize their learning processes [28], which may introduce adapt to time-varying workloads, the proposed algo-
+additional delays and network traffic. Lastly, the coordination rithm considers as DRL inputs both local task features
+overhead between distributed agents can become significant, and forecasts about the upcoming load in the CEC.
+especially in large-scale networks, potentially offsetting the During the training, HOODIE considers only single-
+benefits of distributed learning, step offloading decisions in order to enforce each agent
+provide fast decisions and avoid ping-pong effects.
+Also, the delay introduced in multi-hop offloading
+C. PROPOSED SCHEME AND CONTRIBUTIONS strategies is eliminated. Under this option, HOODIE
+In this paper, we propose a Hybrid Computation Offloading simplifies the interfacing requirements (needed in
+via Distributed Deep Reinforcement Learning (HOODIE), multi-scale CEC) for multi-hop offloading and, thus,
+appropriate for delay-aware decision-making in CEC. Under can be deployed in multi-agent CEC systems.
+a multi-server topology graph of CEC, HOODIE leverages 6 Extensive analyses and simulations were conducted to
+distributed and autonomous DRL agents to intelligently as- showcase the learning process of the HOODIE scheme
+sist on task placement decisions. The objective of HOODIE and its complexity, as well as to quantify its scala-
+is to jointly optimize task computation delay and CEC bility when the Edge layer in densified by multiple
+throughput (or minimal drop rate) by dynamically balancing servers, Also, quantitative simulations were carried out
+hybrid task flows across CEC resources. Unlike existing to provide HOODIE behavior insights under dynamic
+offloading schemes that rely on (i) iterative approaches task traffic settings and comparisons against baseline
+with high inference delay (as in heuristic methods), (ii) algorithms.
+huge amount of data exchange in central locations (as in 1
+centralized ML), (iii) periodical learning synchronization (as The paper is structured as follows. In Section II, all the
+in federated learning), and (iv) vertical task flows engaging system model elements are analytically specified. Section II
+battery-sensitive end-devices (as in distributed ML in MEC), formulates the optimization problem for distributed DRL-
+HOODIE enables dual functionality at edge nodes, allowing based hybrid offloading. In Section IV, we outline the
+them to host both local and external workloads arrived proposed HOODIE scheme, along with its complexity and
+from IoT layer. To reduce complexity, each HOODIE agent convergence analyses. Finally, Section V includes all the
+does not require knowledge on the decisions made by other numerical outcomes for training and validating HOODIE
+agents. The optimization problem is formulated with known performance, whereas Section VI contains the work sum-
+task timeouts and other task features under stochastic traffic mary and extensions. To enhance readability, Table 1 lists
+at each agent. To solve this problem, HOODIE state input all the acronyms used in this article.
+received both local task characteristics and forecasts about
+the upcoming load of the CEC nodes.
+The contributions of the present work can be summarized ۱۰ SYSTEM MODEL
+as follows In this section, we thoroughly describe all the systemic,
+architectural and functional principles underlying the pro-
+‏و‎ An analytical modelling and problem formulation is posed decentralized Cloud-Edge computing system. We first
+presented for the mathematical description of the hybrid present the overall system model and then we outline each
+task offloading in CEC. HOODIE particularly fits to of the system elements and components. Since the rest of
+scenarios where both edge and cloud resources need to the methodology uses multiple mathematical symbols, Table
+4 vouume
+
+OJ Logo
+TABLE 2. Mathematical symbols
+‏ات‎ ‘Symbol Meaning [Unit] [[Symbot_ Meaning (Unit)
+Re N Set of EAs and Cloud wh"'"(t) Completion time slot of
+ke 9 ‏۲ج‎ private task un (t)
+rise eS ‏مر‎ £ —— Setof EAs wT (0) Waiting time of private
+9 = FAN M Set of ECs ‏گر‎ Private Processing
+۹ Pi sssnaggagg toto Capacity of EA n
+4a» ۳ ‏سم الا‎ [cycles/see]
+“ ۹ Paras (= a) Se Do T Set of time slots R Set of link data rates
+5 ‏كت‎ Hu Set of task sizes Ru Horizontal data rate
+a 5 > Horizontal OMoading ‏لا‎
+‎ee ۳۳۰ Oe N Number of EAs Ry Vertical data rate {bps}
+TBP erscamne to toatempetate ‏تمه نمی‎ | | iy Number of ECs RoE Data rate between BA n
+‏ی‎ pt ~~ =» Data provisioning and node k [bps]
+ost
+FIGURE 1. A three-layer computing system model where each Edge Agent | 7 Number of time slots || wr! (0) Waiting time of
+is able to locally compute its assigned tasks or to offload the tasks either offloading task un (t)
+horizontally towards another Edge Agent or vertically towards the Cloud. ftime slots
+A Time slot duration [sec] |] w2/4(t) Completion time slot
+2 summarizes all the mathematical notations for the ease of 4. offending ask un(®)
+exposure. P ‘Task arrival probability || u(t) Task ID offloaded by
+EA nto node k at time
+A. SYSTEM ARCHITECTURE teak ava binary index ‏هر‎ ae task uot
+‘As shown in Fig.1, a three-layer (loT:to-Edge-to-Cloud) | "(0 Tsk arrival binary index |) nf (O thnk task wa)
+ith N ۳۳ 1 its
+network with ۸۲ Edge Agents (EAs) and one! Cloud is un(t) Task ID arrived in EA n||12%(t) Length of public queue
+considered for covering multiple IoT areas. The network neat " ‏ات‎
+‎supports Edge Computing (via the multiple EAs) and Cloud 0 ۳ em atime so
+computing (via the Cloud) capabilities. Let the set of EAs ۲ ۲
+r ۳ ‘ana M(t. Si of task un(t) [bits] ۲ Set of active sof
+plus the Cloud be N= {1,2....,N,N +1}, where the ["™(0 Sie oftskun( (isl) ‏تا‎
+‎element NV +1 indexes the Cloud. For convenience, we also |) ps. ine density af tak | Ault) Nombr af sctve abe
+let € = N - {N +1} = {1,2,...,.N} denote the set |?” ole seco) 1 nanan
+including only the EA indices. Each EA n € € is responsible “ ous ‏نویه‎ ۱
+for computing all tasks (or applications) generated by the ‏و و‎ of tsk ‏هی‎ pone mecesing
+respective ‏اما‎ area. Each task is assumed to be non-divisible, ‏و ثكثٍِِ‎
+meaning that it should be computed by an EA or the 7 ‏ات‎ ۳
+Cloud as a whole (no partial computation of the same |) a, ‏بت‎
+‎oa : 4) Binary decision for local || ‏کر‎ Cloud processing
+task by multiple EAs). Considering densified 6G-compliant ae ‏با مات‎ ee ec
+network traffic (i.e. massive devices request the computation ‘ ۳ 1 ۴ 0 ‏تفت ف‎
+of numerous tasks), an efficient decision-making policy for ores te
+8), an effici 1 ing policy a) (0) Binary decision for mP4P(0) Size of the tasks thrown
+the task computations is required. ™ loading task ) hele by public 2 nof
+To enable flexibility in the computation decisions, the ‏سیب‎ task in ۷ ۳۳۳ queue 7 0
+3 from EA n to node k EA kat time slot ¢ [bits]
+system model allows each EA to select among three actions: put
+? . D,.(t) Decision tuple y(t) Completion time slot
+(i) to compute the task Jocally based on its CPU processing ۰ me
+coe " for task un(t) of task u?™?(t)
+capacity, (i) 10 offload the task horizontally to another EA, |), STM ‏ی‎ | NE
+or (iii) to offload the task vertically to the Cloud. Each |") ‏سك‎ tasks ariel Vn 0 ‏ت‎ starting
+task is also associated with a timeout index that poses the in node mat time slot a ee
+maximum waiting time of the task until computation. To task wpe)
+۱ a : ‏رای‎ Historical load matrix |W ———Lookback window of
+ensure intelligent and decentralized decision-making, each teria es oe ۱
+EA runs a DRL model which receives task features and ‏سا‎ “time slot load story (tine stots]
+۱ ۲ 18"°(t) Public queues length A Set of public queue
+traffic information of the other EAs, with the aim to output 1 ee ‏توت‎
+‎an offloading decision that jointly minimize (i) the task throw fooing sis oon length values [bit]
+ratio (respecting the timeout of the tasks) and (ii) the task ۳ Adjacent matrix for ‏وه‎ Binary variable indicat
+"Here we consider a single Cloud entity without loss of generality. The Edge topology ing connection between
+system model can be easily modified to support multiple Cloud entities. EA ¢ and BA ‏و‎
+‏سور‎ s
+
+Giannopoulos et al: HOODIE: Hybrid Computation Ofioading via Distributed Deep Reinforcement Learning in Delay-aware Cloud-Edge Continuum
+Bdge Agent queue n! € € — {n} of each EA n ‏کی‎ stacks the tasks
+[ane Feb Qu offloaded by EA n’, For instance, if EA 5 offloads a task to
+‏نت‎ ۰ EA 3, then the offloaded task is placed in public queue 5 of
+Fas ended ‏سس‎ ۷ EA 34, The Cloud includes only V’ public queues, with its
+7 ۳ ‏لس‎ public queue n € & hosting the tasks forwarded by EA ۰
+Private Quewen cry | ere We assume also that when the computation (or offloading)
+0 ۳ fyb of a task is completed in a time slot, then the next task in
+40 ¥ ‏سیر‎ “| towards the queue will be computed (or offloaded) at the beginning
+OK, CEI” rate Gieven of the next time slot [30]
+Maker ‏سس‎ dy 29)" Ete Aten &
+۱0 B. TASK CHARACTERISTICS
+Mater We let un(t) € Zy denote the unique task identifier (ID)
+assigned to the task arrived in EA n € € att € T. Ata
+plvate quae (er local ik computations ۱ slot f, we use the binary variable ‏)رت‎ to denote
+‘computation of offloaded tasks) and 1 offloading queue (for task if a new local task is arrived in BA n as:
+offloading).
+‏ری‎ = {2+ anew task arrived in EA n at time ¢
+latency (fast processing of the tasks) of the system. We also" = 0. otherwise
+assume M Edge Controllers (ECs) that are distributed in 0
+the Edge layer. In this system model, each EC is in charge Under this definition, the task identifier (ID) can be written
+of monitoring a single EA (M = N, ie. each BA has as tn(t) =2n(t)-un(t), ie. the task ID is set to zero if no
+an associated controller) or a cluster of EAs (IM > N). task arrived, We also define the size of task un(t) as u(t)
+ECs are also able to transfer data from an EA to another, (in bits). The values of task size are drawn from the discrete
+whereas inter-controller communication is also allowed ‏ها‎ set H = {71,12,-.-.1\x)}- The size of task u,(t) can be
+enable data provisioning across different clusters of EAs’. also written as 7n(t) = a(t) - u(t), meaning that the size
+For the following, we focus on one episode that includes a of task is zero when there is no local task arrived in EA n at
+finite set of time slots T = {1,2,...,7'}, with each time _ time slot f. According to the above-mentioned notations, we
+slot t € T having a duration A (in seconds). have ,(t) € HU {0}, Vn € €. Furthermore, each task wu, (t)
+From the communication perspective, we assume that IoT _ is associated with a processing density p,,(t) (in CPU cycles
+devices are served by an area-specific base station through per bit) and a timeout index @,, (in time slots). The former
+wireless links (e.g. LTE, 5G), while each base station n € € defines the number of CPU cycles required to process a unit
+is connected with the EA n € € through a wired fronthaul of data, whereas the latter implies that the task uw, (t) should
+link (e.g. optical fiber)’. Also, all EAs communicate with have been computed until the time slot £+@, —1, otherwise
+the Cloud through e.g. the Internet (uploading/downloading _ it is dropped,
+information).
+The internal structure of a single EA is depicted in Fig.2. 6 OFFLOADING DECISION MODEL
+At the beginning of each time slot, EA n has a new task Once a new task u,(t) arrives in EA n ‏یگ‎ it requires a
+arrival with a certain probability P [30]. Additionally, each decision-making process regarding the computation destina-
+EA has dual behavior, meaning that it can either (i) act tion of the task. The offloading decision-making is achieved
+as local computing node for the tasks associated with the via two decision maker (DM) modules which make two
+corresponding IoT area or (ii) host computational tasks that successive decisions. The first-level DM“) is placed at the
+are offloaded by another EA. To this end, each EA n € € is entrance of EA and the second-level DM©) is located at
+equipped with ۸ FIFO computation queues to execute tasks, the exit of the offloading queue (see Fig.2). Specifically,
+and 1 offloading queue to stack the tasks to be offloaded. PM) decides whether the task is going to be computed
+For EA n, the computation queue n is called private queue ocally or to be offloaded. Given a new task, EA n places
+because it is used for computing the local tasks, whereas the the new task either in the private queue (if DM“) decides
+rest of N — 1 computation queues are called public queues Jocal task computation) or in the offloading queue (if DM)
+because they are used to host external tasks. The public decides task offloading). If a task has been placed in the
+———EE offloading queue n, DM) decides the offloading destination
+2 The Edge Controller represents a logical entity that is able to collect and | ————_____
+share metrics within an edge cluster using monitoring tools and interfaces. “This association policy between the offloading EA and the destination
+In practice, it can be in the same or different physical location from the (Public) queue avoids task collision that may occur when multiple tasks
+EAs that it monitors. are offloaded to the same EA at the same time. Practically, a unique
+3Without loss of generality, it is also possible to assume that the base wired connection is established between the offloading EA n € 6 and
+station and the respective Edge Agent are co-located, the destination queue n of computing node k €.N’.
+۰ vouume
+
+OJ Logo
+node k ‏کی‎ — {n} to which the task will be computed. Central Processing Unit (CPU) with a processing capacity
+Formally, the output of DM() is: of fA?" CPU cycles per second (or Hz). With no loss
+of generality, f¥4-?" is is assumed constant for each EA
+۱ in pri ne€.
+a(t) = ۳ tun(t) is placed in private queue ‏ری‎ "Assuming that a given task 1, (t) is placed in the private
+0, un(t) is placed in offloading queue queue at time slot t € T, we designate ۵۳۷۲ )/( as the task
+where d{)(t) is the binary decision taken by DM ne € Completion time slot. When no task is placed in the private
+for task 1»,(t). Moreover, the output of DM@) is queue at time ۱ we set vf"""(t) = 0. Note that completing a
+task means that it is either successfully processed before the
+a) respective timeout or it is overdue and, thus, it is thrown
+۱ 1, if di) (t) = 0 & un(t) is offloaded To derive the completion time slot of the task w,(t), it is
+40 = from EA n to node k 3) necessary to know how long the task remained in the private
+0, if d(#) = 1 (ocal computation) queue. To this end, we define w?"""(¢) as the waiting time (or
+i ۱ ۳ the number of time slots) of task u,(t) in the private queue
+where ‏یر‎ is the binary decision taken by DM) n € € until completion. This means that, if task up(t) is decided
+and denotes that, if the task is not locally computed (ie. to be locally computed, it will stay for w?""(t) time slots
+۳) = 0), the task up(t) will be offloaded from the in the private queue’. For a given task up (t) placed in the
+offloading queue of EA n € ‏ما‎ the public queue « € 6 private queue of EA n ‏اه کی‎ time slot f, the waiting time
+of computation node k € A’ — {n} (ie. the task can be before completion can be given by:
+offloaded towards an EA or Cloud and the task cannot be
+offloaded to a public queue of the source EA).
+
+Consequently, the number of bits occupied in the private wh" (t) = max (۳ ‏)هر‎ (t)} + 1 ۷۰
+queue (and offloading queue) of EA n at time slot t is equal 6
+to dh? + na(t) (and (1 = dh) ya(t)). Also, a task can be where the outer max{-} operation ensures that negative
+offloaded to at most one destination node, as reflected by the values of w?"”(t) ate set to zero, whereas the inner max{-}
+next formula: operation reflects the completion time slot of the previous
+
+task with the highest completion time. Specifically, the
+YS (> (4) waiting time of the task u,(t) is equal to the (positive)
+keN={n} difference between the completion time slot of the most
+
+Furthermore, the number of tasks arrived at the computa- time-consuming previous task (placed in the private queue
+tion queues (private plus public queues) of computation node att € {0,1,...,¢— 1}) and the arrival time slot of task
+n€N at time slot ¢ is given by: u(t). Based on the above, it is also feasible to calculate
+
+the completion time slot of task 1, (t) if it is placed in the
+(a) yy private queue at time slot f, as follows:
+00 = ۳ 10 ‏وس‎ an i ne 0 ۳
+wen ‏رو‎ ۳۳۵ = min{t + 00+ ] -1,
+
+where U,(t) is differently calculated for EAs (they have fn “4 0
+both private and public queues) and the Cloud (it has only t+ dn(t) - i}
+public queues). The first branch reflects the number of tasks ۲
+arrived in EA n at time slot t as the sum of the tasks Where the first argument of the min{-} operation is| the
+that are going to be locally computed (first term) plus the {Me slot of the task completion when the task is locally
+tasks that are offloaded by other EAs (second term). The Processed, whereas the second argument is the time slot
+
+۱ ۱ ‏و‎ i, When the task is thrown. Also, [-] denotes ceiling operation.
+second branch represents the number of tasks arrived in ۱
+the Cloud at time slot ) as the sum of the offloaded tasks Specifically, the task u(t) starts ‏ما‎ be processed at time slot
+that have the Cloud as computing destination. Finally, we ¢+wh"'"(t) and the processing duration is [eee] time
+define a decision tuple D,(t) = (a2 ۸ {n}) slots. Otherwise, if the sum of the waiting and the processing
+
+۳ duration exceeds the task timeout, the task will be thrown.
+
+which reflects the computing destination of task 1, (t). For " ne ss ‏تب‎
+‎example, if task u(t) is offloaded to EA 3, then Da(t) Fo" instance, if a new task arrived in EA 3 at time
+
+۱ : ِ slot 5 and it is decided to be locally computed, then
+[00.10.0,8).(0.4)..-.0.9),0.N +). ug(5) is placed in the private queue. Suppose that pre
+
+vious tasks (1), us(2), w3(3) and ug(4) have already
+
+D. PRIVATE QUEUE MODEL been placed in the private queue for local computation
+Each task 1, (t) that is going to be locally processed is placed.
+in the FIFO private queue n of EA n € €. The local tasks Notably, the value of w”"" (t) is computed by the EA n before placing
+stored in the private queue of EA n are processed in the local the task u(t) in the private queue.
+vouuMe 7
+
+Giannopoules et al: HOODIE: Hybrid Computation Otloading via Distributed Deep Reinforcement Learning in Delay-aware Cloud-Edge Continuum
+with completion time slots ۷ ۳)( = 2, ۷۳ )۵( = 6,
+۳ )۵( = 3 and ۳) = 10, respectively. To calculate ott
+the waiting time of ug(5), we apply (6) taking w2""(5) = we/7(t) = ‏)رد ند‎ ( — t+ it ۲۰ € € (9)
+max {0, max{2, 6,3, 10} — 5+ 1} = 6 time slots for u3(5)
+to wait until start of processing. w2/J(t) reflects the number of time slots required for waiting
+in the offloading queue’. Thus, as implied by (9), w°!(t)
+E. OFFLOADING QUEUE MODEL cannot be negative and is equal to the difference between the
+Similar to the private queues, the offloading queue of each completion time slot of the most time-consuming previous
+EA is a FIFO queue which is responsible for stacking the "SK un(t’) (vt! > {0, f= 1}) and the arrival time
+local tasks to be offloaded. Once a local task tn(t) of EA Of task un(t). We set ۷۲) = 0 if there is no task for
+n © & is selected for offloading, the offloading queue of the ffloading at time slot ۸۰ To compute the completion time
+source EA is connected to the target public queue of the SIOt of a task u(t) that is placed in the offloading queue of
+destination EA or the Cloud through a wired link®, Since EA”, the following formula should be used:
+it is not always possible to assume all-to-all connectivity
+across EAs in practice, we can let the symmetrical matrix ol = min fee ‏و‎ (+
+G denote the adjacent graph of the Edge layer topology, " "
+with each element G(i,j) = G(j,i) = 1 when EA i a?) (t)-m(t)
+can establish direct bidirectional connection with EA j, + ۱ > RITA 1 ‏با‎ 10
+whereas G(i, j) = 0 otherwise. When all-to-all connectivity keN={n} nk
+is assumed, all elements of matrix G are equal to 17. Without t+ dn(t) - 1}.¥n 3
+loss of generality, the link data rate for the horizontal EA-to-
+EA communication is assumed constant for each pair of EAS where 2) is equal to 1 if and only if EA n offloads to
+and roared as Ry, whereas the wk dave rate ۷ the vera! node k. It is evident that (10) computes the completion time
+“to-Cloud communication is Ry, and it is also assumed siot as the minimum between the time slot for successfully
+constant for each EA-Cloud pais Let also R = (Ut Hv} offtoading the task and the time slot of the task timeout
+lenote the set of available data rates, where Fy and Rv are The time slot when the task is successfully offloaded to
+measured in bits/sec with Ry > Ry. If EA n€ E offloads the destination node is equal to the sum of the arrival
+the ‏اه‎ to the computation node k > N ~ {n} (another time slot t, the waiting time w°//(t) and the offloading
+EA or Cloud), the data rate R°!! of the communication link Ont] - ”
+is calculated as follows: time [Eeevtny “RITA ۱ Finally, ‏بر‎ = Ry when
+‏یگ‎ = 1 (task is offloaded towards the Cloud),
+pif _ ۷۰ ۱8 og ‏ری‎ otherwise 1) = Ry (task is offloaded towards another
+‏ی‎ Ry, ifk=N41 EA).
+where the first (and second) branch corresponds to the data
+rate of the horizontal EA-to-EA (and the vertical EA-to- PUBLIC QUEUE MODEL
+Cloud) communication link. Each EA n € € has N — 1 public queues to host the
+If we assume a task u,(¢) that is placed in the offloading Processing of external tasks offloaded by other EAs. The
+queue of EA n at the beginning of time slot f, the waiting Cloud entity maintains ۸۷ public queues, being capable of
+time in the offloading queue w?//(t) and the task completion hosting the processing of the tasks offloaded by all EAs.
+time slot 2/4(t) can be defined, as in the private queue case. Each public queue is matched with the offloading EA,
+Note that the completion time slot for offloading the task is ™eaning that the public queue ۶ of a given node acts as
+equal to the time slot number when the task is either sent to the offloading destination of EA i > &. For convenience, it
+the destination node or dropped. For example, W2/1(5) = 16 is assumed that, if a task offloaded by EA n € E arrives at
+means that the task arrived at > 5 in EA 6 and placed in the _ the destination node k < N’— {n} at time slot ¢ € T, then it
+offloading queue will be completed at t = 16. The number of is placed in the FIFO public queue n for processing at time
+time slots required by the task w,(f) to wait in the offloading Slot + 1. Upon placement of the offloaded task 1n(t) in
+queue (until completion) can be computed as follows: the public queue n of EA k at time slot t, a new task ID
+u?"?(t) € Z,, is assigned to the task, ensuring that the task
+SFor the ease of exposure, here we assumed wired connections between With source node n, destination node and queue placement
+‏ی‎ ۳ ِ rule follows the next equation:
+7Under dynamic Edge layer topologies, matrix G can be assumed as 9 ۰
+time-varying (i.e. G = G(t)), but here we assume constant adjacency ®The value of w9/4(t) is calculated by the EA n before making the
+between EAs. decision on which queue the task un (t) is placed.
+8 ‏سور‎
+
+OJ Logo
+public queues, which means that the processing capacity
+‏ار‎ if BA n offtoaded to node ۸ allocated to an active task ult!) 0 > ( time slot t
+una lt) = 9 4) otherwise (1) is fA °/An(t) (or fO"4/ Ag(t)). This equal distribution
+۱ ۱ of the processing capacity amongst the active public queues
+where u(t) stands for the task ID arrived at EA n € € follows the principle of the generalized processor sharing
+at time slot 6 > {0,1,...,t— 1}. This means that the ID model [31]. Under this definition, the processing capacity
+assigned to the task at the public queue of node k is identical of the public queues dynamically depends on the number
+with the original task ID assigned when the task was initially of active queues at each time slot and cannot be known in
+arrived in the source node n. — advance. Instead, each EA is only aware of the public CPU
+We also define n'y (t) > HU{0} as the size (in bits) of the processing capacity of the other EAs f?4-?"® and the Cloud
+task arrived in the public queue n € € of node k € N— {n} ‏ترا‎
+‎at time slot ¢ € T, meaning that itis the size of task (۰. ‏مصنما‎ ml”"*(t) denote the size (in bits) of the tasks
+For completeness, if u?"?(t) = 0 then 72"((t) = 0. Let also thrown by the’ public queue n € € of node k € NV - {n}
+۱۳۲) represent the length (in bits) of the public queue n at the end of time slot t, the public queue length can be
+of node k at the end of the time slot ۸۰ For instance, if the  tetrospectively updated as:
+third public queue of the Cloud has two tasks of 8 bits each
+at the end of time slot 14, then we set 12" , (14) = 16 bits.
+A public queue n of node k is called active queue at time pent) = max{0,2"0(¢ = 1) +۱۳۳۵)
+slot ¢ if and only if either a new task is inserted to the public ‏مرو‎ (13)
+queue at time slot ۶ (ie. ‏ره‎ > 0) or there are queued mbt) — Sis}:
+tasks at the end of the previous time slot (ie. 12%2(t—1) > 0). wee Balt) Ae)
+Therefore, the set of the active public queues of node k € Nv ۲
+۰۲۳30۳۵, We Ser Ot Hie active Public queues of node where the number of bits of the public queue n € € of EA
+at time slot t € T is defined as: ۹
+k € € — {n} at the end of time slot ۸ is equal to number
+vb sub of bits stayed at the queue minus the number of bits left
+fringe) > 00۳0 1( < the queue. Specifically, 1?%(t) is equal to the length of the
+neé— (ey) ir ۲ ۶ (for EAs) public queue at the end of the previous time slot (first term),
+Ax(t) = pub, rib (12) _ plus the number of bits arrived at time slot ¢ (second term),
+0 > 004 -1( < minus the number of bits dropped by the queue at the end
+ne 2 k= N +1 (for Cloud) of the time slot ¢ (third term), minus the number of bits
+processed between t — 1 and ¢ (fourth term). To compute
+where the first branch is the set of the active queues for ‏هه‎ ]?"(t) (ie. length of public queues of the Cloud), we
+EA and the second branch is the set of the active queues for can apply (13) by replacing f°" with fC!"
+the Cloud. Evidently from (12), the set A,(t) contains the Regarding the end of the computation for the tasks stored
+indices oF the Dublic queues with pending (asks that have in the public queues, we define y(t) € Tas the com-
+cen offloaded by the respective source EAS to the node k. pletion (task computation or timeout) time slot of the task
+The number of elements of set Ay(t) is Ax(t) = |Ak(t)] w"®(t) (ie. the task has been either computed or thrown by
+and is equal to the number of active public queues of node node k). Given the load uncertainty over time and that the
+‏سای‎ apr ( cannot be known by neither the EA n nor the node
+Apart from the CPU for running the local tasks fn" +k before the task has been actually addressed (processed or
+each EA n € & is equipped with another public CPU thrown), we can indirectly define the value of W?"?(t) based
+FAP (in Hz) for processing the tasks stacked in the ۱ ۲
+۱ ۱ ۱ a ‘EAlpud on the time slot of starting the computation (of task w"?)
+public queues. Without loss of generality”, we let ff = ۱ pub joub
+fEar® =. = pPAM whereas the Cloud has a Unik (t)- Thus, the relationship between wp'y'(t) and Uf. (t)
+CPU of fll Ha, with fCloud ‏هقرج‎ Yn EE, cam be expressed as:
+Assuming no priority across EAs!, the public CPU of each
+EA n (or the Cloud) is equally allocated to all the active 7
+‏عحعع و‎ 77*) = max{t, max ۳ + 1۳ (14)
+It can be easily assumed that the public CPU of each EA has different ed
+processing capabilities or even that each EA has multiple public CPUs with ۱
+different or equal processing capacities, where (14) reflects that the task w"?(t) either starts being
+"Opriritzed policies can be also adopted, without oss of generality. For processed immediately after its arrival to node k (ie. at time
+example, it is possible to consider higher priority for the tasks of specific slot ¢) or waits the most-demanding of the previously stored
+EAs than others by assigning different weights per EA. In this case, the tasks (i.e. maxy< VPM (t’), ۷۶ = {0,1,...,f— 1}) to be
+allocation of the public queue processing capacity is achieved based on finished and starts being processed at the next time slot. In
+these weights addition, the size of task u?"?(t) can be bounded as:
+vouuMe 1
+
+Giannopoulos et al: HOODIE: Hybrid Computation ‏ودقهه ال‎ via Distributed Deep Reinforcement Learning in Delay-aware Cloud-Edge Continuum
+VRRO-L we Apub ۷0 ‏سس شیر‎ ۲ 0/۳
+Afi pub is ‏ناسمه[ سگم رو‎
+where the right part of the two-sided inequality (15) implies ‏تست‎
+‎that the size of the task u?"?(t) does not exceed the number 2 ‏باس‎
+‎of bits processed by node & within the computation time fies 2
+interval of the same task, whereas the left part implicitly = ao ۳ 1
+forces the number of bits processed within J?"?(t) and ‏سل‎ 2
+۱۳ (t) —1 to be lower than the size of task u?"?(t), Overall, ‏تک‎
+‎inequality (15) tells that there are still bits of task u"?(t) to
+۱ in we) _ pub FIGURE 3. The DRL interaction loop between a given EA n and its
+be processed within vj. (6) — Land vn (t). Note that (15) gavironment for optimal handling the task offloading inthe CEC. The
+stands for EA-to-EA offloading (i.e. n € € and k € E—{7}) environment of EA n involves its loT area tasks and all the CEC
+and, at a given slot i > T, it should be n € Ax(i). In the computing nodes, including the other EAs and the Cloud.
+case of EA-to-Cloud offloading, inequality (15) can be used
+by replacing f24°" with fCloud ۲
+‏لا‎ replacing ‏رل‎ ِ the respective cluster of EAs). Specifically, at each time slot
+t, each EA requires the W previous load values of the other
+G. HISTORICAL LOAD LEVELS nodes for purposes of inferring the local HOODIE DRL
+ECs keep track of the historical load timeseries of each ‏۸ظ‎ model, as shown in Section A.
+and the Cloud. The load of a node k > at time slot is Qverall, the time spent on profiling computation and
+expressed as the number of active queues Ax(t). To this end, communication performance can be assumed minimal due
+ECs maintain a matrix of the load levels per node, denoted to two reasons: (i) Profiling is performed instantly and in
+as L(t)'". This matrix has dimensions W x (N +1), where parallel during other tasks’ execution and communication,
+W is the lookback window and ‏ار‎ + 1 is the number of the meaning that the system collects and computes data without
+computing nodes (i.e. all EAs plus the Cloud). As such, L(t) introducing significant delays; (ii) Profiling data are com-
+contains in each column j € NV the load of node j from the — puted and stored at the end of each time slot, allowing the
+time slot t — W to time slot t— 1. Each element (i,j) of RL agent to use the data in the next decision-making phase
+matrix L(t) reflects the number of active queues of node j without interrupting the current operations.
+at time slot ¢— W +i —1, as expressed in the following:
+Ill DECENTRALIZED VERTICAL AND HORIZONTAL
+Lig(t) = Aj(t-W +۸ 1( (16) TASK OFFLOADING IN CEC
+Vie (1,2,.... WEI EN, In this section, the main principles and the mathematical
+where max{L,,(0)} =N— 1, for ‏رای‎ and M04elling underlying the HOODIE algorithm are outlined.
+۲ ۱ Considering a multi-agent DRL scheme, where each EA
+‏ز‎ € € (max number of active queues in the EAs), whereas ote Be
+tnax{L,j(t)} = N. fori e (1-2.....1V} andj ‏ربب‎ as a DRL agent, a decentralized hybrid (ie. vertical
+ied and horizontal) task offloading across CEC is proposed.
+(max number of active queues in the Cloud). Based on the
+In brief, at a given time slot, each EA observes the CEC
+above, the matrix L(t) has the following structure: ° a ‘i
+environment state (local task characteristics, load forecasting
+۳ of the other nodes) and makes a decision (local computation,
+ant ۳ / anal ۳ W / vertical offloading or horizontal offloading). The way that
+LW = i(t-W+1) ... Anai(t-W +1) ‏رون‎ EA-specific HOODIE models are trained aims to ensure that
+: ۰ : long-term offloading decisions jointly minimizes a two-fold
+Ai(t—1) ‏)بر‎ - 1( cost function: (i) the task execution latency, and (iii) the task
+Given that there are M distributed ECs in the Edge Layer ۳ Tate due to timeout disrespect.
+of the CEC system, each EA is capable of receiving a single
+or multiple columns of matrix L(t) upon request to the 2۰ ORL MODELLING ELEMENTS
+associated EC (e.g. the nearest EC or the EC that controls It is assumed that each EA n € € runs a DRL model for
+nan purposes of making efficient decisions on task computation
+‘We assume thatthe number of active queues is shared by each EA and or offloading. In general, multi-agent decentralized DRL
+the Cloud at the end of each time slot, The bandwidth overhead for sharing schemes are characterized by: (i) the state that is observable
+the load levels is negligible, since, in the worst-case, the Cloud broadcasts. by each DRL agent at each time slot, (ii) the available actions
+[log V7 bits to the ECs, whereas each EA transmits [log (NV ~1)] bits that each DRL agent is able to take, and (iii) the reward or
+to the associated EC. punishment received by each DRL agent as a result of taking
+10 vouume
+
+OJ Logo
+TABLE 3. DRL terminology 1) State space
+[Symbol Meaning (Unit) [| Symbol Meaning Unie) | We let S = {S1, Sp,..., Sy} denote the set of EA-specific
+3 Set of state spaces 5 State space of sets, which means that the element n € of set S is the
+of all DRL agents DRL agent » finite and discrete state space of EA n, which is defined as
+Sa(t) State vector of DRL] an(t) Action vector of DRL_ | Sn = {$n(1)-Sn(2);--.,Sn(T)}. Specifically, at the start of
+agent n at time slot ¢ agent nat time slot t time slot t € T, each EA model n € € observes the state
+ra(t) Reward received by DRL ‏وه‎ Cost for processing vector S,(t) which is given by:
+agent n at time slot ¢ task un(t)
+c Penalty for task loss. 0 Cost for processin; 7
+, Oe oan sult) =[na(t).gt(). w(t, as
+۰ Value of e-greedy policy |] ۵۳۳۹۵ Cost for processing (1), L()|
+task un (t) externally
+Tn Policy of EA n 7 Optimal policy of EA n sab,
+for task offloading for task offloading where, for each EA n >, the vector I"(t—1) = (me (t-
+1 Discount factor 9m Qmodel parameters | 1(,۲ 6۸-۲ n}). For instance, we can compute the length
+ee ۳ 0 pee " of the public queues hosting the tasks offloaded by EA 2
+Ont eee a) seen a) at time slot t= 1 as Be 1) = [Bae - 1), 2 —
+Qn) Qualue of sateaetion |] Neopy Update fequeney of | 1), 184%(t— 1)... 8%,,(t— 1]. Thus, the state vector of
+pair of EA n Q-model an EA n is comprised of some local observations at time
+An()  Advantage-action value |/MSE() Loss function of slot t (Le. the values of 7, (t),wP"'"(t) and we/S(t)), and
+of action a under ‏,رک‎ )( HOODIE model the local computation’? of ۱۳۹۵ — 1) at time slot ۸-1
+cir Learning rate Ne Number of training | according to (13). Notably, each EA knows the number of
+episodes bits that it has offloaded to another node at each time slot.
+Np Size of replay memory || Nix Batch size Since each EA broadcasts the number of active queues at
+Gm Target Q-model parame-||Du(1) Set of previous tasks of | each time slot, it can also compute the number of bits related
+ters of DRL agent EA n completed exactly | {9 its offloaded tasks and processed by another node. This
+at time slot t is achieved by checking (i) whether there are remaining bits
+of a given task to be processed at the current time slot, and
+(ii) whether the timeout of the task has passed. For instance,
+if EA 5 has offloaded a task of size 100 bits to EA 2, it
+a given action from a particular state. As in Markov Decision can compute the number of its bits processed at the end of
+Processes, a DRL agent transits from an environment state time slot t by locally computing the term ‏ی‎ To this
+to another according to its actions, while also receives a end, EA 5 needs to know only (i) the processing capacity
+reward in each of the state transitions. Since each DRL 2?" of EA 2 (it is known from the beginning of the
+agent has local observability of its own state in multi-agent training process as global variable) and (ii) the number of
+DRL schemes, rewards are the only way for a DRL agent active queues Ao(t) of EA 2 at time slot t (it is shared by
+to sense whether a local (and, usually, optimistic) decision each EA through EC).
+is beneficial for the global system. Hence, the main goal is Noteworthy, the state vector of each DRL agent at time
+to find, for each DRL agent, the (sub)optimal mapping from slot ¢ involves, among others, a forecasting value of the load
+local states to local actions, so as to ensure system-wide cost evel of each computing node at the next time slot ¢ + 1.
+minimization. This is achieved by passing the W’ previous values of the
+For the ease of exposure, Table 3 tabulates all the load timeseries through an LSTM network, as illustrated in
+acronyms related the DRL terminology and symbols. Note Fig. 5.
+that, as shown in the general DRL interaction loop of Fig. 3, Regarding the state space dimensionality of vector s»(¢),
+cach DRL agent treats the local task features and the rest of the number of all possible states that can be visited
+the DRL agents (and the Cloud) as part of its observable by a single DRL agent is equal to H x T? x AN x
+external environment, meaning that the local states and {0,1,..., N}"°(Y*), where A is the set of public queue
+actions concerning the EAs are independent between each length values.
+other, whereas all actions affect the common CEC system,
+In other words, the load of EA 5 is part of the environment
+of EA 2, and vice versa, The HOODIE model used by each "7 compute ‏دا‎ based on (13), each EA n knows how many
+EA nis depicted in Fig. 4. Below, we present the local state, is tave been removed (processed or thrown) fom the public quewe of
+the local action and the system-level cost function for each — sl the other nodes (other BAS and Cloud). Thus, the terms mi (l) and
+DRL agent. Se oT of (13) are known by each EA n.
+vouume "
+
+Giannopoulos et al: HOODIE: Hybrid Computation ‏ودقهه ال‎ via Distributed Deep Reinforcement Learning in Delay-aware Cloud-Edge Continuum
+2) Action space function includes: (i) the reward is omitted (denoted as *Not-
+Once a new task un(t) is arrived in EA n at the beginning a-Number’ (NaN)) if no task arrived, (ii) a negative value
+of the time slot ¢, the DRL agent observes the state vector of —,(t) if the task was successfully processed, or (iii)
+sn(t) and takes an action a,,() for this task. The action @ negative penalty —C’ if the task was thrown. Note that
+is two-fold and concerns both the DM“) (whether the task ¥?'?(t') is the time slot when the task un (t) was processed
+is going to be locally processed or not) and the DM’) (to upon offloading (w,,(t) arrived in EA ni at time slot t and
+which node the task will be offloaded), as defined in Section was placed in the public queue of node k at time slot ۶ > (۰
+C. This dual decision is reflected by the action vector a,,(t), The cost received upon processing the task u,(t) reflects the
+which is selected by EA n € & at time slot slot ۶ € T, as delay term, and is defined as follows:
+follows:
+@rriv(t), if ‏تا‎ = 1 (local processing)
+an(t) = [40.Da0] ay a= ۳-۷ if 4( = 0 (offloading) a
+It is worth mentioning that every new action an(¢) that where &2"'¥(t) is the cost for processing the task un(t)
+is taken at time slot ¢ changes the environment state, thus Jgcally and is given by:
+Sn(t+1) 4 ‏برد‎ )۸(۰ This is attributed to the fact that each task
+offloading decision changes the environment state in terms meriv(s) = prt) 41 (22)
+of the length of the private and public queues, the waiting u(y 5 ; ۳ as
+time for processing or offloading and the upcoming load, "4 ®R""(t) is the cost for processing the task in another
+Also, the number of available actions for a given DRL agent "Ode and is computed as:
+is equal to {0,1} *", denoting that each element of vector ۳
+۰ 13
+a,(t) can be either 1 0۴ ۰ 9 = y yah (write) e+ 1) (3)
+keN={n} Ut
+3) Cost function Note that, the term +1 in (22) and (23) implies that the
+By taking an action a,(t) from a given state s(t) at time Processing of task arrived at ¢ starts at the next time slot.
+slot ‏با‎ the DRL agent n € € causes a new environment
+state s,(t + 1), while also receiving a reward r,(t + 1). 8: PROBLEM FORMULATION
+‘The reward r,,(t+ 1) received at time slot f+ 1 refers to the This section presents the optimization problem for optimally
+action a,,(t) taken at time slot ۸, and can be either positive or handling the offloading decisions in CEC systems. The goal
+negative. Also, the aim of using rewards, which are returned _ is to enable each distributed DRL agent (located in each
+by the environment to the DRL agent, is to represent the EA) making optimal offloading decisions so as to ensure
+cost function of the problem. low task delay and low task loss rate, Let, denote the
+Here we consider the joint minimization of the task policy learned by DRL agent n ‏ی‎ which is the mapping
+execution delay (i.e. the time interval between task arrival from the state space to the action space, i.e. ‏ره‎ )۵( 4% an(t),
+and task execution) and the task loss ratio (due to timeout VSn(t) ‏مرگ‎ The main objective of each DRL agent n is to
+violation). To this end, the reward r,,(¢ +1) is given by: find the optimal policy 7%, that maximizes the expected long-
+term negative reward (which is cumulatively collected during
+NaN, if ra(t) =0 (no task arrived) # Sets of time slots). This is expressed in the following
+objective function:
+‏,)رت‎ if UR (t) > + ۵, -1
+pub yr
+۲۳+ 1( = ‏و‎ < t+ On — 1 = argmaxB{ > ۱۰۸0
+(task successfully processed) tm lee
+‏رت‎ otherwise (task thrown) ۳ subject to: constraints (60 (2)
+where ©,(t) is the cost (combining delay for local or (13-15), 20)-23)
+offloaded processing) of task u,(t) (from task arrival to Where function E{-} is the expectation over the random and
+task execution) and C > 0 is a constant penalty received — time-varying task arrivals, task characteristics, and the deci-
+if the task is thrown. The three cases of the rewarding sions made by the other DRL agents. Also, 7 > (0, 1] is the
+___ ‏_ع_‎ discount factor which scales the future rewards. Evidently,
+The action vector is comprised of N’ +1 elements, with each element (24) implies that the HOODIE problem is efficiently solved
+taking values from {0,1}. In most cases, one element is set to 1 and the by finding the optimal series of actions which return the
+rest are set to 0, but there are also chances to have multiple 1's, This is the maximum accumulative costs. Note that, the ideal policy
+case when we have equally good actions (e.. itis equally good to offload would converge in zero rewards, since we have defined
+4 task to either EA 3 or EA 5). In this case, we select randomly one of negative rewards (because delays reflect negative impact on
+those options. the task completion),
+2 vouume
+
+OJ Logo
+nl > m0 ‏مت‎ \f) Li) ‏نت‎ Ly)
+‏هس۱۳‎ wP*) — (Ei0oT E20] [einen ۳
+wtf) ‏مس‎ nolo — n 77 BY ‏زر‎
+‏و متام‎ (E210 20] -_ 0 Pe
+tng py So nee) — SE \2¢5y(0.0y(0)
+‏]کت‎ 3 acd 0 : i Z|;
+Game ‏ای‎ 5 |" Ly ۱ 4 5 Leet
+20 ‏لش‎ 2 bey > ‏اجه‎ ۷ Sa
+by Ste st
+5 ‏لا‎ FIGURE 5. LSTM model for predicting the upcoming load of each node at
+time slot ¢ + 1 based on ۱۷ previous values (relative to the current time
+FIGURE 4. The HOODIE neural network structure for DRL agent (or EA) n, _SI0t t) of each node-specific load.
+which estimates the (-value of being in state s,, (1) and taking any of the
+available actions a,, (t). Symbols L, (t) denotes the i" row of matrix L(t).
+to select delay-aware decisions (i.e. offloading towards over-
+IV. HOODIE SOLUTION loaded nodes will be avoided). Thus, the HOODIE model
+‘To solve the optimization problem defined in (24), this Teives @ W-element history (provided by matrix L(¢)) for
+1 ۱ a each node and passes it through an LSTM model to obtain
+Paper proposes the HOODIE algorithm. This algorithm is th. predicted load in each node at the next time slot.
+based on the principle of DRL and, especially the Deep ۳ sor
+QLearning (DQL) [7], [32]. HOODIE enables each EA
+to use a DQL-based model for making decisions on task 4g, 4 hidden
+offloading in a decentralized manner. As DQL is a model- 2) Fully-connected hidden layers oo
+free approach, HOODIE can be applied for efficient task The Q(-) function is estimated via the usage of multiple
+offloading in the CEC, without requiring analytical and fully-connected layers which are stacked consecutively. The
+complicated information of the large-scale system state (e.g, ittermal structure of the each fully-connected layer contains
+there is no need for an agent to know the others’ decisions).  Pre-defined number of hidden neurons, each one having
+‘According to the DQL, each DRL agent n € € holds ‏و‎ # Rectified Linear Unit (ReLU) as activation function. Each
+deep neural network (the so-called deep Q-network) which Neuron of a given layer is connected to all neurons of the
+estimates the “quality” (or the Q-value) of each state-action P€Xt layer.
+pair, In other words, each DRL agent estimates the Q-
+function (sn(t), (0). In specific, the Q(-) function
+lunction Q(sn(t),an()). In specific, . QC) fanctio 3) Dueling DQL layer
+reflects the expected long-term reward of being in state s,,(t) ۲
+- The output of the fully-connected layers is inserted to an
+and taking action a,,(t). Thus, by properly training the deep “
+Qnetwork, each EA can continuously select the actions with Advantage & Value (A&V) layer, which implements the
+‏ی‎ cont ۱ ۱ technique of dueling DQL [29]. Dueling DQL has been
+© ۱ widely used as an efficient DRL technique with improved
+learning ability in mapping state-action pairs to Q-values.
+A. THE HOODIE MODEL _ The idea underlying dueling DQL method is to decompose
+The structure of the HOODIE neural network model is he Jeaming of the Q(.) function in two different compo-
+depicted in Fig. 4. Note that the taining of the HOODIE 1... (iy the state-value function V;,(s «| 0 ) (quantifies
+model of DRL agent n is to properly adjust all the network * 5 ۱ ols ( Canannes
+parameters @,, (ie. the matrix containing the weights of ‏ررو‎ ‘H¢ contribution of the state in the Q-value), and (fi) the
+Connections and the biases of all neurons), such that the ation-advantage function Ay (su(t),a{é) (quantifies the
+Q-values of all possible state-action pairs are accurately contribution of the action in the Q-value, given a state).
+predicted. Below, the HOODIE layers are outlined. In this sense, dueling DQL can better approximate the Q-
+values, since the long-term rewards are assessed separately
+for states and actions [29]. Both functions A(-) and V(-) are
+4) Input layer estimated by two fully-connected layer-based subnetworks,
+The input layer consists of the state vector, including the task _ mentioned in Fig. 4) as A and V, respectively.
+size, the waiting periods in the private and the offloading
+queues, the length of the public queues of the other nodes,
+and the predicted load levels of all nodes. This means that, 4) Output layer
+to produce beneficial task offloading decisions, the HOODIE By passing a state-action pair through the HOODIE model
+model of a DRL agent takes into account predictions about of EA n with parameter @,,, the output layer provides the
+the load level of the other nodes. Intuitively, being aware Q-value of being at being at state s,,(t) and taking action
+of the future load of the other nodes can guide the model a € {0,1}V*, which is given by:
+vouuMe 5
+
+Giannopoules et al: HOODIE: Hybrid Computation Otloading via Distributed Deep Reinforcement Learning in Delay-aware Cloud-Edge Continuum
+Algorithm 1 HOODIE taining in EA n € €
+Qn (sn(#)-a|@n) =Vn (su(0)|4) + [An (su(¢).a{0) 1: Learning inputs: T, a1,, 7. Ne. Nr. Na. Neopy
+1 ۱ 2: Initialize Replay Memory with Nz, rows
+‏و‎ > An (su(t).a len) 3: Initialize Q,-model with random 6
+ale {0,141 4: Initialize target Q,,-model with random ۵۶
+(25) 5: Initialize Current Episode = 0 and ¢ = 1
+where {0,1} +! represents the action space of each DRL & for each episode i = 1,2,..., Nz do
+agent, with size 2۳*۳ (all possible actions). As imposed by 7 _ Initialize s,,(1) ۳
+(25), the Q-value is computed as the sum of the state-value § for each time ‏اه‎ do
+and the action-advantage value, with the latter being rela. Set an(t) = 0 {Assume no task arrived}
+tive to the mean action-advantage value across all possible !0: Pick a random number rand € [0,1]
+hetions. us if'rand <P then
+2 Set «(t) = 1 {New task arrived}
+8. THE HOODIE ALGORITHM 3 iy ۱
+This section describes the training and the inference phase |" SY a now task ID un(t)
+of the proposed algorithm. The HOODIE algorithm incor {¢ Select action a,(t) for tn() based on (26)
+porates N’ distributed models (one model per EA), each > gag ig
+one acing asa task offloading suggester. We consider each ‏بو‎ Gherve next state sq(t-+ 1)
+۸ hosting both the training and the inference of the local 5, for euch completed task uus(t?) > Da(t) 27) do
+erates 20 Collect reward ‏)برد‎ ( of task w(t") based on (20)
+21 Store experience (sn(t’),antt), ‏جرد(‎
+‎1) Training phase 1)
+Algorithm 1 presents the pseudocode for training a single- 27, end for
+agent model based on the experience replay technique 3, Sample a random batch B of Nz experiences
+[32]. Specifically, each transition from a given state to 24; for each experience row i € B do
+another is recorded in the so-called experience tuple ‏بر‎ Assume row format a8 (Suis naira)
+(5n(t),an(0),ra(t + sult + ») and is stored in the ‏هد‎ if = (Terminal time slot} then
+experience replay memory, which has a size of Np rows. 37 Set target Yi = Tn
+In each of the Nz; training episodes, the DRL agent runs 3g, else
+for T time slots. To estimate the Q-values, each DRL agent ‏بو‎ {Double Q-learning}
+nm holds two deep neural networks: (i) the Qn-model with 39 Set target ‏را‎ =
+parameters @,, which is used for selecting actions, and (ii) ۳۳ a(x, ۳ (x, 7 2 ۱ 0
+Target Qu-model with parameters 6, which is used for : ee
+estimating the expected long-term rewards. The idea behind 3! end if
+using the Target Q,,-model is to provide target or groundtruth 32: Set predicted ‏زره‎ = Qn (sn is Om, ln)
+values for calculating the error of the Q-values predicted 33: end for 7
+by the Q,-model. Both neural networks have exactly the 34 Set target values Y7°"""(t) = {yn i}. ۷۵ B
+same architecture, whereas the parameters 6,, are uploaded 35 Set predicted values ۷/۳۹) = {2n,}, Vi € B
+more rarely than 0,,. Thus, every Neopy training episodes, 36: Update parameters @,, to minimize loss function:
+6,, parameters are copied to the ‏رل‎ parameters. MSE(YZr9*4(t), ¥Lre4(t)) (see 28))
+The input of the Algorithm 1 is the set of 37; end for
+T.atr.7.Ne.Ne.Ne.Neopy learning hyperparameters 38: Set CurrentEpisode = CurrentEpisode +1
+(that influence the training convergence), whereas the output 39; if mod(CurrentEpisode,Neopy) = 0 then
+is the learned policy 7; defined in (24). This way each agent 40; Set Oy, = On
+n & € can take placement decisions on tasks arriving from 41: end if
+its IoT area according to the locally learned Q-function. The 42; if CurrentEpisode > Ng/2 then
+algorithmic steps can unfold as follows. In each training 43; Set e = 1 — 2(CurrentEpisode — 1)/Np
+episode, the HOODIE agent initializes (Line 7) the state ‏بمب‎ else
+as $3 (1) = [ra(1),wP""(L), w2!F(1),B"(0),L(1)), where 45; Sete =0
+2"2(0) = 0 and L(1) is a zero matrix. Then, the agent 46: end if
+enters in 7’ iterations (Lines 8 — 37) for the episode time 47; end for
+slots. In each time slot t, a new task u,(t) is arrived 48; Output: Optimal policy ‏چم‎ for action-value function Q
+from IoT are n with probability P (Lines 9 — 13). In ‏ین‎ —
+“ ‏سور‎
+
+OJ Logo
+of a new task arrival, the HOODIE agent selects either 2) Inference phase
+an exploratory or exploitative action a,(t) following the The inference phase of HOODIE scheme is performed by
+e-greedy policy as (Line 16) deploying distributed HOODIE models (only the Q-models)
+at each one of the NV EA sites. Upon receiving a new task,
+. each HOODIE model is inferred by a state vector for pur-
+an(t) = Random value of (19), if rand > > (26) poses of properly selecting the best computing destination.
+arg ming Qn (su(0).alem). if rand > 6 In this sense, the inference algorithm is a short version of
+Algorithm I by (i) avoiding Lines 23 — 36 in each time slot,
+2 1 ۵
+where rand is a random number in {0,1} and ¢ is a value (ii) neglecting Lines 33 —46 in each episode and (iii) setting
+updated in each episode according to the Lines 42 — 46. constantly > = 0 to select only exploitative actions in Line
+Based on the above, with probability ©, the agent chooses 16.
+a random action (i.e. exploration), whereas with probability
+1 — 6, choose the lowest Q-value action by inferring the @ COMPLEXITY CONSIDERATIONS
+Qn-model (ie. exploitation). The ¢ starts at 1 and decreases Time complexity can quantified from Algorithm 1 as the
+linearly to 0 during the first V/2 episodes, whereas it is set overall and worst-case number of iterations performed by
+at 0 for the remaining ۱۷/2 episodes (i.e. only exploitation). gach agent, as a function of the learning hyper-parameters
+Since other agents operate under the same CEC environment, sing the big-O notation. Since the training contains Np
+each HOODIE agent n observes the new state (Line 18), episodes and T time slots per episode, the training com-
+regardless of whether a new local task was arrived or not. Hlexity has at least Nip ۰ T iterations. Also, in the worst-
+Since the processing and/or the offloading of task may case, there are (i) Nprev (With Nprev denoting the length of
+take many time slots to be completed, the reward of previous 7p, (1)) iterations per time slot (in Lines 19 - 22) that loop
+tasks arrived at ۶ < ¢ may be collected at the current time over the previous tasks completed at time t, as well as (ii)
+slot ¢. To this end, the HOODIE agent n collects (at time yy, iterations (Lines 24 — 33) that loop over batch samples.
+slot t) the set D,(t) of previous tasks that completed exactly ‘The most time-consuming loop between (i) and (ii) is (ii),
+at time slot t, which is given by: since it contains updates of the target values upon inference
+of Q- and @-models; thus the training complexity has at
+‏مرا‎ 0 least ‏ور‎ ۰ Nz iterations". In Line 36, it is implied that at
+Da(t) = {un(t’)|¢ t and ,(t!) > 0 and 9 2 1
+(8) (۶ > ۸ and a(t!) > 0 an (27) each time slot, the parameters 6,, of the Q-model are updated
+yer? = t or ۳ = 3 through feed-forward and back-propagation steps, according
+to the Gradient Descent (GD) method. Let Np and Ngp
+where D,(t) contains the ID of tasks that are completed denote the number of arithmetic operations (multiplications,
+exactly at time slot ۸۰ This implies that D,, (t) aggregates the Weighted summations, differentiation) required for the feed-
+tasks with positive size (7,(t’) > 0) arrived in EA n in a forward and back-propagation steps, respectively, of a single
+past time slot (t/ > #) and had completion time slot equal Xperience tuple!®. Integrating the above, the computational
+to ¢, either after local (W?"” = t) or external computation complexity for training the HOODIE scheme is O(Ne-T-
+at node k (whit) = 1). Thus, in Lines 19 ~ 22, the agent iy (Np 4 Nar)
+collects the rewards for all previous tasks in set Da(f) and “Ni. hat ince the training of the multi-agent HOODIE
+stores their corresponding experience tuples into the replay a ۶ inne te A
+ees scheme is performed once (or rarely in time for soft retrain-
+memory. In Lines 23 — 33, the agent prepares a batch B of
+samples to which the Q,-model will be updated on, To do ing) the above-defined complexity corresponds exclusively
++ a to the HOODIE training. When HOODIE is used for infer-
+so, it samples randomly Nig rows from the replay memory (2 ne ۱
+33). ae 0 as purposes, the associated complexity reflects only the
+(Line 23), and, for each sample i > B, calculates (i) the f° fyrward passes of the new inference samples (ie, ont
+target values {yn,;} (Lines 26 — 31) according to the Double ward passes ples ( y
+DOL formula [33] and Gi the predicted values ‏زر ی‎ (Line MUliplications and weighted summations to produce the Q-
+39) by inferring the Q,-model. In Lines 34-36, parameters Yalues ofthe input vector) As such, the inference complexity
+Oy, are adjusted so as to minimize the loss function: for a single inference sample is O(Nrr)
+1 xe ۲ “More strictly, we could write Ng ۰ ۰ (Ng + Nprev) iterations;
+‏)مک‎ ۱۳۲۷0 - dem im i) however the term Nprev is neglected for simplicity of presentation,
+(28) O(Nprev) << O(N)
+where MSE(-) reflects the mean (across batch samples) — !The time cost for performing feed-forward and back-propagation steps
+squared error between the vector of predicted ۷۱۳۴۹ )۵( and is positively correlated to the input size ofthe experience tuples, the size of
+target ¥7°"9"(t) values. Finally, Lines 39 — 41 ensure that the output (ie. output neurons) and the DQN density (i.e. number of hidden
+the parameters 0,, are copied to 6,, every Neopy episodes. layers and neurons).
+vouume 0
+
+Giannopouies et al: HOODIE: Hybrid Computation Offloading va Distributed Deep Reinforcement Learning in Delay-aware Cloud Edge Continuum
+we propose the publish-subscribe (Pub-Sub) protocol [37].
+‏و ۵ تا و‎ as shown in Fig. 6. According to this protocol, each cluster
+Message Ber ‏هعرج‎ ‘Message Broker of EAs is managed by an EC, which acts as a broker for
+9۳2 ۱۳4 = —_ message exchanges [38]. EAs subscribe to a dedicated topic
+9 Vesna ‏تا‎ Gar Ses ©) 8۵ eg. “CI for EC 1, *C-2' for EC 2, and so on) and publish
+3 ۲ ۱ ®) updates (in the form of messages) on load history and public
+3 Messages \ & queue length at the end of each time slot. Similarly, ECs
+i 0 0 9 AO {are also subscribers to their own topic to receive updates
+۱ S) | from EAs in their cluster, whereas, to achieve also inter-
+: “ * 1 ECs communication, ECs can communicate with one another
+1 i) 1 by subscribing to each other’s topics for cross-cluster data
+‏ار ی‎ sharing. ECs disseminate the aggregated messages to all
+7 ‏ت‎ subscribing agents within the cluster, enabling all other EAs
+in the cluster to receive this shared information in the next
+FIGURE 6. The Fub-Sub communication protocol er dala sharing within ime slot, This decentralized approach enables efficient and
+scalable communication across agents.
+However, communication delays due to network conges-
+D. CONVERGENCE CONSIDERATIONS tion or latency can prevent some EAs from receiving up-to-
+The convergence assurance of reinforcement learning algo- date information in time for the next decision-making phase.
+rithms can be only proven in the simple tabular RL (TRL), To address the potential impact of communication delays,
+where the Q-function is computed by using a table of state- HOODIE can integrate a recovery mechanism that leverages
+action pairs [34]. This Q-table has a number of rows equal to the temporal learning capabilities of LSTM models. When an
+the number of all possible states (that the agent receives as_ EA fails to receive updated information from its peers due to
+input) and a number of columns equal to the number of all @ delay, the system occasionally exploits the previous time-
+available actions. In this case, for each state-action pair, the Slot’s output of the LSTM model as an input for the current
+Q-function is calculated using the Bellman’s equation [34]. decision-making process. Similarly, if the metric 1۳۳۴۲ — 1)
+As a result, TRL can be efficiently used only in simple iS delayed at time slot f, the agents can occasionally use
+small-scale problems (in which the agent considers a small 1""(t — 2) to avoid network blocking. This allows the
+state-action space) and cannot be considered in practical and delayed EA to continue making informed decisions based on
+large-scale problems (due to time and memory inefficiency _ historical data, without waiting for the delayed information
+for storing the Q-table). to arrive. Once the missing message is eventually reached,
+In the case of HOODIE algorithm, we use approximation ECs can integrate it in the load history for providing valid
+of the Q-function through the use of deep neural networks samples in the future slots.
+(Q-model and target Q-model), given that the state-action The combined use of Pub-Sub protocol with the proposed
+space size is HxT2x AN x {0,1,...,N}"-+D (all avail Tecovery mechanism ensures that the system remains re~
+able states) and {0,1}‘*! (all available actions), respec- _ Silient to delays, given that it provides (i) non-blocking oper-
+tively (see Table 2 for the symbols meaning). The formalistic tion (i.e. the use of LSTM outputs from previous time slots
+convergence of such high-dimensional DQN models can be allows EAs to make decisions without waiting for updated
+only proven under mild assumptions [35] and, consequently, information), (ii) eventual consistency (Le. although agents,
+remains an open theoretical problem [36]. in which DQN ™ay operate on historical data during periods of delayed
+convergence cannot be assured by closed formulas (due communication, the system guarantees eventual consistency
+to stochasticity), rather than using exhaustive simulations, 8 Soon as the missing information is received), (iii) indirect
+Thus, the convergence of HOODIE scheme is empirically sYNchronization (i.e. the recovery mechanism reduces the
+evaluated through an extensive simulations-driven approach, need for strict synchronization ensuring that HOODIE agents
+by applying different values of all learning inputs (see Line Will have inference data for the next time slot within the
+1) of Algorithm 1, as presented in Sections A and B. time frame of the current time slot. Agents can continue
+making decisions autonomously based on local observations
+‏ع‎ INTER-AGENT couMUNeaTION;PRETOCOL AND and historical data, ensuring minimal disruption to task
+processing
+RECOVERY MECHANISM Note that, since the message shared by each EA is low-
+HOODIE considers inter-agent data sharing at the end of 24 (je. contains the number of active queues) and the
+each time slot, since the state vector metrics (or messages)“ between EAs/ECs are considered wired with
+w(t — 1) and L(t) need to be shared across EAs in Comections 2 :
+0 ۱ high bandwidth (e.g. fiber-optics or high-speed Ethernet),
+order to be available at the next time slot, Although many ye can safely assume that the bandwidth overhead and
+different communication protocols can be established ‏شع)‎ the propagation delay associated with message publishing,
+request/response model, peer-to-peer, Gossip protocol), here
+6 ‏سم‎
+
+OJ Logo
+exchanging, and receiving is negligible for practical purposes TABLE 4. System and Learning Parameters
+(ie. the overall messaging delay is highly reduced compared ‏و‎ Symbol [[ Value
+to the considered waiting, offloading and task processing ‏مسج‎ Proabiliy | P| 05 |
+delays). [Horizontal Dara Rate | Ru || 30 Mbps (23)
+\. EXPERIMENTAL RESULTS a oe ee
+In this section, we conduct a numerical and 0 || 0.207 aigacyelovMo 39] |
+driven evaluation of the HOODIE scheme performance | _ NumberorEAS | ON |
+within an CEC system, We begin by examining the optimal | ——~gjacent matrix | @ |) See Fig? |
+training convergence against the critical learning parameters | Gp Frequency in private queues [JE™?™ ‏زد‎
+‎of the distributed HOODIE agents, and then we evaluated | ‏موم تس‎ public queues | F277" ‏زد‎
+‎the impact of several DRL environment parameters to reveal | — cpu fequensy in Chad | JO] B0 Gz
+additional behavior and scalability insights of the proposed Kamer of Tang Episodes | Ne | OO)
+Scheme. Finally, we proceed with a comparative analysis of ۳ ‏بوک‎ Tine slaw [FP]
+HOODIE algorithm against existing baseline methods. [Tine der dant [a ae
+All DRL and LSTM models presented in the following ‏ی تسس‎ 1°}.
+subsections were implemented in Python 3.0, using PyTorch |
+library (version 1.9.0), and the CUDA (version 10.2). The — = :
+derived models were trained on a PC with an AMD Ryzen 7 |_Dissoumtfacor [gf 09
+1800X Eight-Core Processor CPU at 3.60 GHz and 32. GB | _@-ework hidden ayers [Nz 8x 1024 neurons |
+of RAM. ee ee
+۸. LEARNING PARAMETERS AND CONVERGENCE |۳۳
+CURVES ۲ [LSM hidden tayers ‏با‎ | 1x 20 STM [
+To efficiently implement the HOODIE scheme, various S¥S- |-—Resay Memory size PN 10000 samples
+: play Memory size Ne ample
+tem parameters were carefully configured, with particular |The bree Pemaly a]
+emphasis on fine-tuning critical hyperparameters essential ‏من وین سس‎ vg | mnie]
+for optimizing the multi-agent DRL framework. In the
+training phase of HOODIE, we set the system and learning
+parameters as tabulated in Table 4. We adopt an application-
+agnostic approach, where the computational tasks are char- ‏مرس‎
+‎acterized only by their size (7,(t)) and processing density aH
+(on(t) rather than being tied to specific application types. As 0 @) 0 0 (0
+parameters represent a wide range of real-world ‏درد‎
+‎applications that HOODIE can handle, from lightweight <<
+tasks (e.g. updating or deleting operations to databases, text ee ae
+editing or processing) to more computationally demanding (ty (42) (48) GO OOVOS
+tasks (e.g. image or video processing, ML model inference).
+Noteworthy, the number of time slots per episode was set to a a
+T = 110, where at the first 100 slots, the HOODIE agents are ‏سس‎
+‎able to take actions, while the last 10 slots were considered
+for emptying any non-empty queue, allowing the reward ۱
+collection for pending tasks. Note also that, if we consider "CU" 7: €49® layer topology graph of matrix G with 20 EAs.
+varying values of one or many parameter(s) in the rest of
+the subsections, the rest of the system settings correspond to influence on how intensely the DQN weights are adjusted
+Table 4, unless explicitly specified. Also, in this subsection, during the back-propagation steps. The specific tuning of
+the number of HOODIE agents is equal to 20, whereas the aj, was guided by the system parameters detailed in Table
+considered Edge layer topology is shown in Fig. 7, upon 4, under moderate task arrival traffic across all HOODIE
+plotting the adjacent matrix G as undirected graph. agents (P = 0.5). As presented in Fig. 8a, where the learning
+Initially, a key focus was on selecting the appropriate curve of the HOODIE scheme across different learning
+learning rate aj, which was tested across a range of values: rates is depicted, A learning rate of aj, proved to be the
+air = [10-°,5 - 10-°, 10-8, 10-7,5 - 10-7, 7 - 10-*] (see most effective, striking an optimal balance between fast
+Fig. 8a). In general, the choice of learning rate plays a learning and maximum accumulated reward. As such, a joint
+crucial role in balancing the speed of convergence with minimization of the task completion delay and task drop rate
+the stability of the learning process, since it has direct is guaranteed. The performance metric of HOODIE training
+‏سور‎ ”
+
+Giannopoules et al: HOODIE: Hybrid Computation Otloading via Distributed Deep Reinforcement Learning in Delay-aware Cloud-Edge Continuum
+| carga a load and edge layer density (N = (10,15, 20]). To assess
+the HOODIE performance, we used the optimally trained Q-
+5 ۳۰ models of each agent (as they resulted from Section A) and
+gas, 3 ‏سره‎ we calculated the average reward collected during a series of
+Bos Est pay 200 validation episodes (i.e. all agents performed exploitative
+8 ۳ 7 actions),
+eit a} Y Evidently, as the task arrival probability increases, the
+‏]یمیس و‎ 2 | ۷ average reward decreases across all configurations, indicat-
+‏مور وک‎ 2000 3000 4000 soo ۳ ۵ 1090 2000 3000 aoon sian ig the system’s increased strain under higher task loads.
+1 Ene Tein lode This is attributed to the complexity introduced when the
+system load is significantly increased, imposing further sub-
+FIGURE 6. Accumulated reward time-course averaged across the optimality in the task placement decision. The task arrivals
+distributed HOODIE agents as a function ofthe training episodes for ۱
+different (a) Learning rate or, and (b) Discount factor > density directly influences the task load on the system,
+with higher probabilities indicating more tasks that arrive
+۲ ۱ ۲ simultaneously, requiring the agents to make more frequent
+is the cumulative reward, as defined in (20) and (24), that aad complex decisions about whether to compute locally
+was collected in a series of 5000 episodes, and averaged Sy" ‏همان‎ Notably, with fewer agents (N’ — 10), the
+across all the distributed HOODIE agents. Note that, since od declines a e steeply. whereas, with more agents
+the task delay is considered a negative metric, the ideal value" ۱ ‏ی‎ ۱ a
+Hea e ctahne nthe the cera ce a aueating (N= 20) the decline is less pronounced, demonstrating
+andincreasing ۱ 8 improved scalability and better handling of the increased
+In ii at de impact of the discount factor + is also “otKload. However, even with additional agents, the system
+۲ a oh Pat ‏وا سای‎ varying SHOWS diminishing returns as the task arrival probability
+th vai 1 fry tnay have eenctall ‏تس‎ ne 5 oi he results highlight the importance of density-complexity trade-
+DRL policy ‏ما هه‎ since it directly eaulnies belance ott» Which balances computational resources and task load
+betes ionmeadtate andl falar round the stability aad clleetively, thereby maintaining higher performance levels
+۵ learning 6 Be a ‏ای‎ om Fig ee, te ‏سای‎ under varying conditions. Note that the high negative rewards
+‏ایک تن‎ fe oan 90. ۳ ‏ات‎ do not reflect the average delay of the tasks, but they indicate
+P 5 7 we wai 5 the high negative penalties received for task drops, which is
+HOODIE agents exhibit more importance on future rewards, more frequent as the P increases.
+making them mor {ocused on long-term outcomes. st seit, _, Under the same simulations, Fig. 9 depicts the distibu-
+hh o ۱ - Pa si ot the ral nin ‏ب‎ fe tein _ ‘magi, tion of actions taken by the HOODIE agents across different
+iy ۰۱ ۱ 2 ۲۳1۱73۶ iby ۵ ۳ ‏او‎ arrival probabilities, categorized into local computation,
+mizing their immediate rewards. This may happened because yoyi,ontal, and vertical offloading. The results show a clear
+they had not yet fully explored the long-term consequences reference for horizontal offloading, especially as the task
+of their actions. As the training episodes progress, the agents PT ability increases, suagesting that agents often opt
+begin to unlear selfish behavior and shift toward cooperative (Share tasks with neighboring EAs rather than process them
+task distribution. This improved behavior emerges as the ‏وزلمموز‎ of offload them to the Cloud. However, as the task
+agents’ Q-function beter reflects the future states of the arrival probability reaches higher values (e.g., 0.9), there is a
+perwork, discouraging seen monopolize the dy ore. noticeable increase in vertical offloading actions, indicating
+crammed > coowlinate: cooperitive behavior ‏رو موی‎ & Shift towards utilizing cloud resources under heavier task
+‏سای‎ footed. cooperative Dehavior among agen's  joads. The relative consistency in local computation actions
+Simplicity fostered. across different probabilities implies that HOODIE maintains
+a baseline of local processing, but dynamically adjusts its
+5B. HOODIE BEHAVIOR AND SCALABILITY ANALYSIS strategy towards offloading as task traffic intensifies. These
+Using the optimal values of learning rate and discount factor, findings confirm that HOODIE effectively balances action
+here we quantitatively analyze the HOODIE behavior and selection based on current system conditions, with a ten-
+scalability (with increasing number of DRL agents) under gency to prioritize horizontal offloading in most scenarios.
+the variation of several system parameters.
+1) The impact of Task Arrival Probability 2) The impact of Computational Capacity
+Initially, to further explore the impact of the task arrival In Fig. 9c, the average reward is presented as a function of
+probability (P), which is directly proportional to the task the CPU computation capacity (ranging from 4 — 9 GHz)
+traffic density underlying the IoT areas, Fig. 9a shows the dedicated to local tasks, across different numbers of DRL
+HOODIE performance as a function of increasing system agents. The results demonstrate a clear positive correlation
+8 ‏سور‎
+
+OJ Logo
+۱۳ ‏پیت‎ [RMN Task Prob=0.1
+5
+s Se z [ER Task Prob=o 5
+20 * 2 400 | \Task Prob=0.7
+240 NaS z
+B | |-a-Neis agents No
+60 | [eme=N=20 agents a
+0 03 05 0.7 1 ° Local Horizontal Vertical
+Task Arrival Probability Action Type
+(a) (b)
+20 0 0
+3 ۱0 agent] 3 > | 0-0
+S| ‏هرید ۹ سس‎
+3-0 1 ‏اس ید‎ NS
+00 aoa ۳1 ‏هد 0 هت‎
+BA) ‏سره‎ Be i wa
+30 0 2s a =
+4 5 6 7 8 9 10 15 20 25 30 10 15 20 25 30
+CPU Computation Capacity (GHz) Number of Agents (N) Number of Agents (N)
+0 (0 (e)
+FIGURE 9. HOODIE behavior insights under varying system parameters. (a) Average reward vs. task arrival probability for different numbers of DRL
+agents; (b) Action type distribution across task arrival probabilities; (c) Average reward vs. local CPU computation capacity; (d) Average reward vs.
+number of agents under different traffic scenarios; (e) Average reward vs. number of agents under different offloading data rate scenarios.
+between the CPU capacity and the average reward, indicating Heavy Traffic: In this scenario, task sizes increase to
+that as more computational power is allocated to local tasks, between 2— 5 Mbits with a 70% arrival probability,
+the system’s performance improves. This trend is consistent reflecting a more challenging environment.
+across all agent configurations, although the magnitude of | ¢ Extreme Traffic: This scenario pushes the system fur-
+improvement varies. Notably, with fewer agents (V = 10), ther, with task sizes between 3 — 7 Mbits and a
+the reward increases more significantly with rising CPU 90% arrival probability, simulating highly demanding
+capacity, suggesting that in a more resource-constrained conditions.
+environment, local computation power plays a critical role
+in maintaining system efficiency. Conversely, in scenarios
+with more agents (V = 20), the improvement is more mod- _As the number of agents increases from 10 to 30, the aver-
+est, likely because the additional agents can offload tasks, @8¢ reward declines across all traffic scenarios, indicating the
+thereby reducing the dependency on local CPU capacity. £fWing challenge of managing more complex networks with
+These findings underscore the importance of optimizing local large state-action spaces. However, the rate of decline varies
+CPU resources to enhance the overall reward, especially in Significantly with traffic intensity. Under moderate traffic, the
+systems with a limited number of agents. system maintains relatively high rewards, even as the number
+of agents increases, suggesting that the system can effi-
+ciently manage moderate workloads with additional agents.
+In contrast, under heavy and extreme traffic conditions, the
+average reward decreases more sharply, with the extreme
+3) The impact of Task Traffic Intensity traffic scenario showing the steepest decline. This behavior
+In Fig. 94, the average reward is illustrated as a function of highlights the solution convergence in coping with larger
+the number of DRL agents under three different task traffic task sizes and higher arrival probabilities, where adding
+scenarios: more agents may lead to coordination complexities and
+reduced efficiency. These results underscore the importance
+‘* Moderate Traffic: This scenario features tasks with sizes _ of optimizing the number of agents in relation to the expected
+ranging from 1-3 Mbits and a task arrival probability traffic load to maintain high performance in the HOODIE
+of 50%, representing a quite balanced workload. framework,
+vouume 19
+
+Giannopouies et al: HOODIE: Hybrid Computation Offloading va Distributed Deep Reinforcement Learning in Delay-aware Cloud Edge Continuum
+4) The impact of Offloading Data Rate algorithm against six baseline algorithms, under different
+In Fig. 9e, we examine the average reward as a function of variations of the CEC system parameters. We consider the
+the number of DRL agents under three distinct offloading following offloading algorithms:
+data rate configurations:
+1) Random Offloader (RO): Each agent acts randomly,
+© Balanced Capacity: In this scenario, the horizontal choosing an action with probability 1/3 between local
+offloading data rate is set at Rx = 10 Mbps, while execution, vertical offloading, and horizontal offload-
+the vertical offloading data rate is Ry = 30 Mbps, rep- ing to another EA. If the selected action is horizontal
+resenting a typical distribution of offloading resources. offloading, the destination EA is selected randomly
+© Horizontal-centric Capacity: This scenario increases with probablity 1/(N — 1).
+the Ry = 20 Mbps, balancing it equally with the 2) Full Local Computing (FLC): Each agent constantly
+Ry = 20 Mbps. computes all the received tasks locally.
+۰ Vertical-centric Capacity: This scenario skews the of- 3) Vertical Offloader (VO): Each agent constantly of-
+floading resources towards vertical offloading, with a floads all the received tasks to the Cloud for compu-
+Ri = 5 Mbps and Ry = 40 Mbps, simulating a tation,
+setup where the cloud is dominantly preferred for task 4) Horizontal Offloader (HO): Each agent constantly
+offloading. offloads all the received tasks to another EA. Each
+It is revealed that, across all scenarios, the average reward ae ceaen ۱ 77 of iit a) tole
+decreases as the number of agents increases, indicating selected for offloading.
+“a ° ms sts = 5) Balanced Cyclic Offloader (BCO) [40]: Each agent
+the growing complexity of managing larger networks. The ۱
+° ۱ selects an action in a round-robin manner. Taking EA
+balanced capacity scenario maintains the highest rewards : ۱
+n= Las an example, the first received task is locally
+across the range of agents, suggesting that a balanced allo- ۱ ۲
+۱ ° computed, the second is placed at the Cloud, the third
+cation of offloading resources allows for more efficient task eed at EA the frutth at EA 3, and
+distribution and processing. The horizontal-centrie scenario is placed at EA 2, the fourth at EA 3, and so on.
+۱ sng. 6) Minimum Latency Estimation Offloader (MLEO)
+shows a steeper decline in reward, particularly as the num- :
+on : [41]: According to this powerful scheme, for each new
+ber of agents exceeds 20, indicating that when horizontal
+۱ ٍِِ task, each agent estimates (in advance) in which queue
+offloading capacity is prioritized, the system may struggle 3 :
+‏سس‎ ۱ ۱ the task will experience the lowest delay, and then
+with increased coordination demands. The vertical-centric ۱
+places the task in the lowest-delay queue. Specifically,
+scenario exhibits the steepest decline in rewards, especially : ۱
+۱ ۲ ۲ given a new task w(t) arrived at time slot ¢, agent
+at higher agent counts, suggesting that an over-reliance on ven a x ved x si 1
+1 ۱ ۱ n= 1 computes N +1 estimated delay scores, cor-
+vertical offloading to the cloud can lead to increased latency 7 ۷
+ame a responding to the ۷ + 1 different available placement
+and reduced system performance. These findings emphasize ۰ :
+‘ ۲ options (i.e. Option #1: the task is placed at private
+the importance of carefully configuring offloading capacities vane ۱
+۱ queue; Options ۵-۷۰ the task is placed at offloading
+to optimize the HOODIE framework’s performance as the ’ 4
+mew queue and then at public queue of EA 2 — N; Option
+network scales. Notice that, in Figs. 9d-e, we have further ° ۱
+ied up the system by considering up to 30 HOODIE #N +1: the task is placed at offloading queue and
+vents up the system by considering up 0 « then at public queue of Cloud). The delay that will be
+It should be noted that, in the previous training and experienced if the task will be placed in the private
+ae queue is directly computed using (6). The delay (in
+validation curves of Sections A and B, we focused mainly on ۱
+۱ ° sec) that will be experienced if the task will be placed
+the cumulative rewards collected by the agents, since they are ۱ ۱
+۱ in the public queue « of node k € N — {n} (other
+the most accurate measures of the training performance to ۱
+EAs or Cloud) is computed using (9) and then adding
+assess HOODIE behavior. However, although reward values the 2:69.18(4 1) using (13). Finally, the agent
+reflect directly the learning course of the DRL agents, they ۳ aca sing ‘ling he a an fe
+cannot be directly interpreted because they implicitly carry alects thse aetton Corresponding, to) the lowest delby
+information about both the task completion delay rewards Sistas
+and the high-valued penalties received for task drops (see For afl offloading schemes, the performance metrics se-
+(20)). For this reason, in the the comparative outcomes of jected for comparison purposes were the average compu-
+Section C, we evaluate the HOODIE performance in terms tation delay and the drop ratio, both calculated over 200
+of more interpretable metrics, such as the task completion validation episodes. These metrics are the main components
+delay and the task drop ratios, resulted from a series of 200 oF the objective function defined in (24), which reflects the
+validation episodes. long-term joint optimization of both task delay and drop
+ratio. To contrast the schemes in terms of the average delay
+C. COMPARATIVE ANALYSIS (see Figs. 10a-c), we set a high timeout at 10 sec to allow
+To comprehensively investigate the HOODIE algorithm per- tasks remain in the system for quite long period. In this way,
+formance, this section focuses on comparing the proposed we are able to compare which scheme offers the minimum
+20 ‏سم‎
+
+OJ Logo
+‏ماه‎ ho) Muto
+— 0 1
+44 Saf Zab ae ‏هار و‎
+10 Ss ‏مس‎ slit ‏نس‎ +
+oi 030507 09 3 4 ‏و‎ 6 7 96 98 10 ۱۵۵ 04
+‘Task Arrival Probability CPU Computation Capacity (GHz) Task Timeout (sec)
+(a) ) ©
+os ‏سس‎ a os ———_——
+۳ eo Al. ~
+g os ۱ ‏ام‎ EM gos
+E oat of ‏کم‎ Zoi — Ao
+‏سه 0 2 — 0 متا‎
+10305 ۵7 ۵ 1 7 16 18222 ad
+‘Task Arrival Probability CPU Computation Capacity (GHz) ‘Task Timeout (sec)
+@ © 0
+FIGURE 10. Performance comparison of HOODIE against six baseline offloading schemes under varying conditions. (a) Average delay vs. task arrival
+probability; (b) Average delay vs. CPU computation capacity; (c) Average delay vs. task timeout; (d) Drop ratio vs. task arrival probability; (e) Drop ratio
+vs. CPU computation capacity; (f) Drop ratio vs. task timeout. Average delay is negative by convention
+computation delay among tasks that were not dropped, given Fig. 10d illustrates the drop ratio as a function of task
+that the dropped tasks are encountered in the drop ratio. arrival probability for the same set of offloading schemes.
+On the contrary, the results in Figs. 10d-f consider a strict As expected, the drop ratio increases with higher task arrival
+timeout at 2 sec, where the schemes are compared in terms of probabilities, reflecting the system’s difficulty in meeting
+the drop ratio. Drop ratio was computed as the total number _ task deadlines under heavier loads. HOODIE demonstrates
+of the task dropped, divided by the total number of tasks the lowest drop ratios across the board, indicating its ef-
+arrived in all EAs. By convention, delay values are negative, fectiveness. in. preventing task drops even as the system
+since they reflect negative impact on the task completion. becomes increasingly burdened. The FLC and HO schemes,
+in contrast, exhibit the highest drop ratios at higher task
+arrival probabilities, underscoring their limitations in adapt-
+1) The impact of Task Arrival Probability ing to varying load conditions. The MLEO scheme shows a
+Fig. 10a presents the average delay as a function of the OMpetitive drop ratio at moderate task loads but struggles
+task arrival probability across different offloading schemes. U84er extreme conditions, similar to its performance in
+‘As the task arrival probability increases, the average delay @Verage delay. These results may highlight the HOODIE
+generally decreases for all schemes, reflecting the growing Superior ability to minimize task computation delays and
+challenge of handling a higher load within the system's lim- 4'OP rates by dynamically adjusting offloading decisions
+ited computational resources. Notably, HOODIE consistently based on current system conditions.
+outperforms the other schemes, achieving lower average
+delays across the entire range of task arrival probabilities.
+The HO and VO schemes, while effective at lower task 2) The impact of Computational Capacity
+arrival probabilities, show significantly higher delays as the Fig. 10b illustrates the average delay as a function of CPU
+load increases. The MLEO scheme also demonstrates strong computation capacity dedicated to local tasks across different
+performance, particularly at moderate task loads, but it falls offloading schemes. As the CPU capacity increases from
+behind HOODIE as the task arrival probability approaches 3 — 7 GHz, most schemes show a reduction in average
+089. delay, highlighting the importance of local computational
+‏سور‎ 21
+
+Giannopouies et al: HOODIE: Hybrid Computation Offloading va Distributed Deep Reinforcement Learning in Delay-aware Cloud Edge Continuum
+
+resources in minimizing task processing times. Notably,
+
+the FLC scheme, which relies solely on local computation, 03 -
+
+maintains a consistent delay across all CPU capacities, as it se
+
+directly benefits from the increased local resources. However, 05 A
+
+it does not outperform other schemes that leverage offloading = a
+
+strategies. HOODIE consistently achieves lower delays com- 3-07 ‏و‎
+
+pared to other schemes, especially at higher CPU capacities, 1 ia
+
+indicating its effective balance between local computation B09 9
+
+and offloading decisions. The MLEO scheme also performs # fa
+
+well, but its delay reduction is less pronounced compared 2-1
+
+to HOODIE, particularly at lower CPU capacities, where ۲ oa
+
+offloading decisions become more critical. ۲
+
+Fig. 10e shows the drop ratio as a function of CPU ۷
+
+computation capacity for the same set of offloading schemes. Ce eT RTE ETT
+
+‘As expected, higher CPU capacities lead to a reduction "Training Episode
+
+in drop ratios across most schemes, as more tasks can be
+
+processed locally, reducing the likelihood of tasks being jieusion ase toncion a te Vang episode nat tne LSTM
+
+dropped due to deadline violations. HOODIE demonstrates
+
+the most significant reduction in drop ratio, particularly at
+
+lower CPU capacities, where its dynamic offloading strategy HOODIE demonstrates the lowest drop ratios across all
+
+helps manage the limited local resources more effectively. timeout values. These findings underscore the advantages of
+
+The FLC scheme shows decreasing drop ratio as CPU the HOODIE algorithm in maintaining low drop rates, par-
+
+capacity increases. However, it fails to outperform HOODIE ticularly in scenarios with tighter deadlines, where efficient
+
+and MLEO due to its limitation in handling larger task task management is crucial for overall system reliability.
+
+loads without the ability to offload tasks. The VO and HO
+
+schemes show poor performance, as expected. These results D, THE IMPACT OF LSTM INCLUSION
+
+underscore the advantages of the HOODIE algorithm in To evaluate the impact of the LSTM module, we con-
+
+minimizing task drop rates by optimally balancing local com-  qucted an ablation study comparing the performance of
+
+putation and offloading, particularly in resource-constrained the HOODIE framework with and without the inclusion of
+
+environments. the LSTM. The system parameters for this analysis were
+configured with 20 Edge Agents (EAs) an the optimal values
+of + and ‏میرم‎ as presented in Section V.A. We considered
+
+3) The impact of Task Timeout a task arrival probability P = 0.3 and task deadlines
+
+Fig. 10c presents the average delay as a function of task = 1 sec for alll tasks, whereas the rest of the environment
+
+timeout across different offloading schemes. Evidently, as Parameters are noted in Table 4. As shown in Fig. 11, over
+
+the task timeout increases from 9.6 to 10.4 seconds, the the course of training, HOODIE with LSTM converges to
+
+average delay is slightly improved for all schemes, This lower task delays (about 0.35 sec) compared to the HOODIE
+
+trend suggests that longer timeouts allow tasks to wait Without LSTM (about 0.48 sec). This might be attributed to
+
+longer before being processed, potentially leading to more the fact that the LSTM-based HOODIE can better handle
+
+efficient task completion. Notably, the FLC scheme main- ‘he dynamic traffic patterns, which is reflected in’ more
+
+tains relatively consistent delay values across all timeouts, Mficient offloading decisions and task handling. It is also
+
+reflecting its exclusive reliance on local computation, which Temarkable that LSTM-based HOODIE scheme has slower
+
+is unaffected by offloading decisions. In contrast, HOODIE SMVergence than the non-LSTM scheme, potentially due to
+
+consistently achieves lower average delays compared to other the concurrent learning of the traffic patterns. However, it
+
+schemes, indicating its ability to optimize task scheduling Provides faster task execution delay by about 0.13 see, which
+
+and offloading dynamically even as the deadline increases. Might be critical for the tasks to reach their deadlines. Note
+
+‘The MLEO scheme also shows strong performance but with #80 that the inclusion of LSTM is also valuable for the
+
+slightly higher delays than HOODIE, particularly at shorter *0¥ery mechanism presented in Section IV.E, where the
+
+timeouts, where the need for accurate offloading decisions ESTM outputs are utilized for replacing missing state inputs
+
+is more critical from delayed or disrupted agents.
+
+Fig. 10f illustrates the drop ratio as a function of task
+
+timeout for the same set of offloading schemes. As expected, ADAPTABILITY TO TRAFFIC VARIATIONS
+
+the drop ratio decreases as the task timeout extends from HOODIE scheme has been trained under various traffic con-
+
+1.6 to 2.4 seconds, allowing more time for tasks to be ditions, with the task arrival probability P determining the
+
+processed and reducing the likelihood of deadline violations. traffic intensity across agents. There might be situations of
+
+سم 2
+
+OJ Logo
+unexpected traffic variations (e.g. traffic burst or decline) in HOODIE framework, allowing the agents to adjust their task
+which HOODIE could adopt an adaptive behavior to handle _ offloading strategies based on evolving network topologies
+these changes. One potential solution would be the P value- and node heterogeneity. Finally, a third extension would
+baled model-switching mechanism that allows the agents _ introduce a parallel distributed DRL framework that operates
+to respond flexibly to varying traffic conditions without between the JoT and Edge layers. Running in parallel with
+the need for retraining in real-time. Specifically, after the _ the HOODIE framework, this extension would enable DRL
+training phase, agents could store their multiple models (each agents at end-devices to autonomously decide whether to
+trained for different P) in a model catalogue. This catalogue compute tasks locally or offload them to edge servers,
+allows agents to operate effectively under both moderate depending on the computational intensity of the tasks and
+and high traffic loads by switching models as needed, As available user resources.
+traffic conditions change, agents continuously monitor the
+current traffic load and select the most appropriate model ackKNOWLEDGMENT
+from the catalogue based on the observed P value. Although The authors would like to thank the ICOS Project part-
+during the transition from one traffic condition to another, ners for their contributions. This work was supported in
+the system may experience temporary network congestion aS part by the ICOS Project funded from the EU HORIZON
+an unavoidable consequence of adjusting to the new traffic RTA programme under grant agreement No 7
+conditions, this mechanism can enhance the adaptability — (hytps:/Awww.icos-project.eu/).
+and minimize the system degradation, Noteworthy, further
+minimization of these transient delays might be achieved
+by combining HOODIE with other traffic anomaly detection REFERENCES
+aisoii [1] B. Trakadas, X. Masip-Bruin, Fi M, Facca, S. T. Spantideas, A. E.
+algorithms (e.g. [42)). Giannopoulos, N. C. Kapsalis, R. Martins, E. Bosani, J. Ramon, R. G.
+
+Prats et al, “A reference architecture for cloud-edge meta-operating
+VI. CONCLUSION AND FUTURE DIRECTIONS systems enabling erssdomain,datantensive, massed appli
+tions: Architectural overview and key concepts.” Sensors, vo
+A. CONCLUSIONS no. 22, p. 9003, 2022.
+This paper presented the HOODIE scheme, a distributed (2) S. Spantideas, A. Giannopoulos, M. A. Cambeiro, 0. Trullols-Cruces,
+-based fra id ta . E, Atwutegi, and P. Trakadas, “Intelligent mission critical services over
+DRL-based framework for hybrid task offloading in the jasc 5g networks: Contra loop and proactive overload detection.”
+Cloud-Edge Computing Continuum (CEC). HOODIE intro- in 2023 International Conference on Smart Applications, Communi-
+duces a flexible, scalable solution that enables both vertical cations and Networking (SmariNets). EEE, 2023, pp. 1-6.
+(edge-to-cloud) and horizontal (edge-to-edge) offloading, (3). ¥. Mao, C. You, J. Zhang, K. Huang, and K. B. Letaief, “A survey
+‘fering delay-aware distributed task plac decisions i ‘on mobile edge computing: The communication perspective.” IEEE
+offering delay-aware distributed task placement decisions in communications surveys & tutorials, vol. 19, no. 4, pp. 2322-2358,
+a multi-agent and dynamic CEC. By deploying distributed 2017
+DRL agents at each edge server, HOODIE ‏ی‎ M: Guo, “Adaptive resource
+ically adapting to changing network environments, Through 1825-1840, 2021.
+simulations, we demonstrated that HOODIE significantly (51 ۴ Wang Sin, ¥. Yang: 5 Zhang, A. Nallanathan,C. ‏ما1‎
+‎and B, Jabbari, “Task offloading with multi-tier computing resources
+reduces task drop rates and average task delays compared to ite generation witeessnetworke” IEEE Journal on Selected Areas
+baseline schemes, especially under heavy traffic conditions, in Communications, vol. 41, no. 2, pp. 306-319, 22
+The results highlight the effectiveness of HOODIE in bal- {6} Q. Fan and N. Ansari, “Towards workload balancing in fog computing
+ancing resource utilization across the CEC, making it highly ‏سیب‎ ion | ‏ون رتم‎ Network Science and Engineer-
+applicable in collaborative cloud-edge scenarios. (7) Q Zhang, M. Lin, L. T. Yang, Z. Chen, and P. Li, “Energy-cfficient
+scheduling for real-time systems based on deep q-learing model,”
+IEEE transactions on sustainable computing, vol. 4, no. 1, pp. 132~
+B. FUTURE DIRECTIONS MLO ۳ ‏نت‎ Pp.
+There are direct extensions of the HOODIE framework (8) M-T. Thal Y-D. Lin, YC; La and HT. Chien, “Workload and
+ight be i ۱ 0 i capacity optimization for cloud-edge computing systems with vertical
+that might be identified. The first extension would involve and horizontal offloading,” IEEE Transactions on Network and Service
+incorporating energy efficiency into the objective function, ‘Management, vol. 17, no. 1, pp. 227-238, 2019.
+By considering different power consumption levels of fast- [9] A. Giannopoulos, S. Spantideas, N. Kapsalis, P. Gkonis, L. Sarakis,
+processing edge nodes, HOODIE could be enhanced to find 6 Capsalis, M. Vecchio, and P. Trakadas, “Supporting intelligence
+۲ ۱ in disaggregated open radio access networks: Architectural principles,
+an optimal trade-off between reducing latency and mini- aifml workflow, and use cases,” JEEE Access, vol. 10, pp. 39580
+mizing power consumption, under both latency and energy 39595, 2022.
+constraints. This would allow the agents to dynamically [01 ¥. Wang. M. Sheng, X. Wang, L. Wang, and J. Li, “Mobile-edge
+th ot hie computing: Partial computation offloading using dynamic voltage
+decide when it is more efficient to exploit high-power Scaling," IEEE Transactions on Communications, vol. 64, no. 10, pp.
+nodes or conserve energy. A second extension would be to 4268-4282, 2016.
+accommodate a dynamic CEC topology, where the connec- [11] S. Sardeliti, G. Scutari, and 5. Barbarossa, “Joint optimization of
+‘ons bi do nodes and theic computesional capaci radio and computational resources for multicell mobile-edge comput-
+tions between edge nodes and their computational capacities ing.” IEEE Transactions on Signal and Information Processing over
+change over time. This could be modeled within the current Networks, vol. 1, no. 2, pp. 89-103, 5
+vouume 2
+
+Giannopoulos et al: HOODIE: Hybrid Computation ‏ودقهه ال‎ via Distributed Deep Reinforcement Learning in Delay-aware Cloud-Edge Continuum
+[12] ۷ Mao, J. Zhang, S. Song. and K. B. Letaief, “Stochastic joint radio node ease,” IEEE/ACM transactions on networking, vol. 1, n0. 3, pp.
+and computational resource management for multi-user mobile-edge 344-357, 1993.
+computing systems." IEEE transactions on wireless communications, (32] A. Giannopoulos, S. Spantideas, N. Kapsalis, PL Karkazis, and
+vol. 16, no. 9, pp. 5994-6009, 2017. P. Trakadas, “Deep reinforcement learning for energy-efficient multi
+{13} C. You, K. Huang, H. Chae, and B.-H. Kim, “Energy-efficient resource channel transmissions in 5g cognitive hetnets: Centralized, decentral-
+allocation for mobile-edge computation offloading.” IEEE Transac- ized and transfer learning based solutions,” IEEE Access, vol. 9, pp.
+tions on Wireless Communications, vol. 16, no. 3, pp. 1397-1411, 129358-129374, 2021
+2016. [33] H. Hasselt, “Double q-learming:” Advances in neural information
+(14) J, Chen, H. Xing, Z. Xiao, L. Xu, and T, Tao, “A del agent for jointly processing systems, vol. 23, 2010.
+optimizing computation offloading and resource allocation in mec,” [34] R. S. Sutton, “Reinforcement learning: An introduction,” A Bradford
+IEEE Internet of Things Journal, vol. 8, no. 24, pp. 17508-17524, Book, 2018.
+2021 [35] J. Fan, Z. Wang, ¥. Xie, and Z. Yang, “A theoretical analysis of deep
+[U5] H. Li, K. D. R. Assis, S. Yan, and D. Simeonidou, “Drl-based long 4q-learning,” in Learning for dynamics and control. PMLR, 2020, pp.
+term resource planning for task offloading policies in muliserver edge 486-489.
+computing networks," JEEE Transactions on Network and Service (36) V. A. Papavassilio and ٩. Russell, “Convergence of reinforcement
+Management, ol. 19, no. 4, pp. 4۱5۱-4164, 2022. learning with general function approximators,” in IJCAI, vol. 99, 1999,
+[16] J. Wang, J. Hu, G. Min, A. Y. Zomaya, and N. Georgalas, “Fast adap- pp. 748-755,
+tive task offloading in edge computing based on meta reinforcement [37] S. Khare, H. Sun, K. Zhang, J. Gascon-Samson, A. Gokhale, X. Kout-
+learning,” IEEE Transactions on Parallel and Distributed Systems, soukos, and H. Abdelaziz, “Scalable edge computing for low la-
+vol. 32, no. 1, pp. 242-253, 2020. tency data dissemination in topic-based publish/subseribe:” in 2018
+(17) ¥.G. Kamm and Geol. Wa, “Autoscale: Energy efficiency optimization IEEE/ACM Symposium on Edge Computing (SEC). IEEE, 2018, pp.
+for stochastic edge inference using reinforcement learning.” in 2020 214-227,
+S3rd Annual IEEE/ACM international symposium on microarchitecture _ (38] T. Rausch, $. Nastic, and $. Dustdar, “Emma: Distributed qos-aware
+(MICRO). IEEE. 2020, pp. 1082-1096 git middleware for edge computing applications,” in 20/8 IEEE
+{18} ¥. Kim and C. Wa. “Autoscale: Optimizing energy efficiency of end- International Conference on Cloud Engineering (IC2E). IEEE, 2018,
+to-end edge inference under stochastic variance,” in arXiv preprint. pp. 191-197,
+Xin, 2000, p. arXiv2005 02544, [39] C. Wang, C. Liang, FR. Yu, Q. Chen, and L. Tang, “Computation
+[19] G. Nieto, I de la Iglesia, U. Lopez-Novoa, and C. Perfecto, “Deep offloading and resource allocation in wireless cellular networks with
+reinforcement learning techniques for dynamic task offloading in the mobile Saree IEEE Transactions ‘on Wireless Communica-
+pasa Saas omimuum” Jounal of Cloud Computing. ol 13.001. 49) sinaidasi and. Z. Balavth, “Enhanced round-robin algorithm
+{20} WW. Fan, F Yang, P- Wang, M. Miao, P.Zhao, and T. Huang, “Drl-based in the cloud computing environment for optimal task scheduling,”
+service function chain edge-to-edge and edge-to-cloud joint offloading ] ‏ی و نمی‎ oh,
+in edge-cloud network.” IEEE Transactions on Network and Service (41) J. Liu and Q. Zhang, “Offloading schemes in mobile edge computing
+Management, vol. 20, no. 4, pp. 4478-4493, 3 tg ‏کر‎ Acceis, Wl 6.
+[21] 5. Rac and M. Brorsson, “Cost-aware service placement and schedul- ‏وت‎ ۲
+ing in the edge-cloud continuum,” ACM Transactions on Architecnure ‏ی‎ H. Jiang, N. Ji, and H. Yu, 'Thsm: A traffic burst-sensitive
+find Code Optimization, vol 21,10. 2 pp. 1-24, 2024 model for ubo-ierm prcioion under ypecial evens” Krowiedge-
+(22] ¥. He, M. Yang. 2 He, and M, Guizani, “Computation offloading ed Systems, vol. 248, p. 108120, 2022,
+and resource allocation based on dt-mec-assisted federated learning
+framework,” IEEE Transactions on Cognitive Communications and
+Nenworking, 2023, yyy ANASTASIOS E. GIANNOPOULOS (Member,
+[23] M. Tang and V. W. Wong, “Deep reinforcement learning for task ۱ IEEE) (M.Eng, Ph.D) received the diploma of
+offloading in mobile edge computing systems,” IEEE Transactions on S55) Electrical and Computer Engineering from the
+Mobile Computing, vol. 21, no. 6, pp. 1985-1997, 2020. : |۳9 Navona! Technical Universiy of Athens (NTUA),
+[24] H, Nashaat, W. Hashem, R. Rizk, and R. Attia, “Drl-based distributed Ay gq Where he also completed his Master Engineering
+task offloading framework in edge-cloud environment,” /EEE Access, FUE MMW wma (Eng) degree, in 2018. He also obtained his
+3004 i \ =) PhD. at the Wireless and Long Distance Commu-
+[25] S. Ding and D. Lin, “Multi-agent reinforcement learning for coop nications Laboratory of NTUA. His research in-
+erative task offloading in distributed edge cloud computing.” IEICE terests include advanced Optimization Techniques
+TRANSACTIONS on Information and Systems, vol. 105, no. 5, pp. for Wireless Systems, ML-assisted Resource Al-
+936-945. 2022. location, Maritime Communications and Multi
+{26] I. Ullah, HK. Lim, Y-J. Seok, and Y.-H. Han, “Optimizing task imensional Data Analysis. ۲
+offloading and resource allocation in edge-cloud networks: a dri He is currently working as a Research Associate at Department of Ports
+approach." Joumal of Cloud Computing, vol. 12, no. 1, p. 112, 2023, Management and Shipping, in the National and Kapodistrian University of
+[27] ©. Ou. H, Wo. R-Li- and P Jao. “Do. A deep meta reinforcement Atte 28 well as Post-Doc at NTUA. He has authored more than 45 seien-
+Teaning-based tak offloding framework for edge-cloud computing” fc publications in the fields of Wireless Network Optimization, Cognitive
+TELE Transactions on Network and Service Management, ‏ام‎ 18, Resource Management, Maritime Communications, Machine Learning and
+mo. 3, pp. 3448-3459, 2021 Brain Multidimensional Analysis. Since 2022, he is a Member of IEEE and
+[28] A. Anelopoutos, A. Gianmopoulos, N. Nomikos, A. Kalafitelis, viewer in several IEEE journals (IEEE Intemet of Things Journal, IEEE
+۸ Havziefremidis, and P. Trakadas, “Federated learning-aided prog. Vehicular Technology Magazine, IEEE Transactions on Mobile Computing
+nostics in the shipping 4.0: Principles, workflow, and use cases.” IEEE ‏نت‎ 62۵
+Access, 2024,
+[29] Z. Wang, T. Schaul, M. Hessel, H. Hasselt, M, Lanctot, and N. Freitas,
+“Dueling network architectures for deep reinforcement learning.” in
+International conference on machine learning. PMLR, 2016, pp.
+1995-2008,
+{30] J. Liu, ¥. Mao, J. Zhang, and K. B. Letaief, “Delay-optimal compu
+tation task scheduling for mobile-edge computing systems,” in 6
+IEEE international symposium on information theory (ISIT). IEEE,
+2016, pp. 1451-1455.
+{31] A. K. Parekh and R. G, Gallager, “A generalized processor sharing
+approach to flow control in integrated Services networks: the single-
+2 vouume
+
+OJ Logo
+ILIAS PARALIKAS (M.Eng) holds a Diploma
+in Electrical and Computer Engineering from the
+National Technical University of Athens (NTUA)
+Engineering (M.Eng) in 2024 from NTUA, with
+his thesis being focused on Artificial Intelligence
+applications in Smart Applications. His research
+interests consists of a variety of fields around artifi-
+cial intelligence. These are composed of Artificial
+Neural Networks, compression methods, such as
+model pruning, knowledge distillation and early
+exit in classification problems. Additional interests consist of medical image
+segmentation, leveraging data augmentation and Generative Adversarial
+Network techniques, as a method to battle data scarcity. Finally, he has
+extensively worked on Deep Reinforcement Learning methods, applied to
+working on the research & development (R&D) department of Four Dot
+Infinity, a company providing smart solutions to businesses.
+SOTIRIOS T. SPANTIDEAS (D.Eng, M.Sc,
+۳1 "| Ph.D) obtained the Diploma of Electrical & Com-
+۱ puter Engineering from the Polytechnic School
+| fof the University of Patras in 2010. He then
+attended the Master Program “Electrophysics” at
+۲۳2 the Royal Institute of Technology in’ Stockholm
+(KTH), from which he obtained the title MSc
+in 2013. In 2018 he obtained his PhD from the
+National Technical University of Athens (NTUA)
+‘of Methods for obtaining DC and low frequency
+‘AC magnetic cleanliness in space missions”. His research interests include
+Electromagnetic Compatibility, Machine Learning for Wireless Networks,
+‘Magnetic Cleanliness for space missions and optimization algorithms for
+Computational Electromagnetics.
+
+From 2014, he is working as a Research Associate with NTUA and the
+National and Kapodistrian University of Athens (Department of Ports Man-
+agement and Shipping - NKUA), participating in muliple Horizon projects.
+He has published over 35 papers in scientific journals and conferences in the
+fields of Electromagnetic Compatibility, Optimization Methods for Wireless
+Networks and Machine Leaming for Resource Allocation problems.
+
+PANAGIOTIS TRAKADAS (MEng, Ph.D) re-
+ceived his Diploma, Master Engineering, Degree in
+Electrical & Computer Engineering and his Ph.D.
+from the National Technical University of Athens.
+His main interests include 50/660 technologies,
+such as O-RAN, NEV and NOMA, Wireless Sen-
+sor Networks, and Machine Learning based Op-
+timization Techniques for Wireless Systems and
+Maritime Communications
+He is currently an Associate Professor at the
+Department of Ports Management and Shipping,
+in National and Kapodistrian University of Athens and has been actively
+involved in many national and EU-funded research projects. He has pub-
+lished more than 170 papers in magazines, journals, books and conferences
+‘and a reviewer in several journals and TPC in conferences.
+‏سور‎
+

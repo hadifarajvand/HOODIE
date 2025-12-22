@@ -64,4 +64,9 @@ class TaskGenerator():
        return self.generate().get_number_of_features()
    
     def get_maxs(self):
-            return np.array([self.size_max])       
+            return np.array([
+                self.size_max,
+                self.priotiry_max,
+                self.timeout_delay_max,
+                self.computational_density_max
+            ], dtype=np.float32)       
