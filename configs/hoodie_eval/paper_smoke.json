@@ -1,0 +1,35 @@
+{
+  "scenario": {
+    "name": "paper_table4",
+    "hyperparameters_path": "configs/hoodie_eval/hyperparameters_table4.json",
+    "seeds": [0],
+    "horizon": 110,
+    "overrides": {}
+  },
+  "agent": {
+    "name": "hoodie",
+    "episodes": 20,
+    "evaluation_episodes": 1,
+    "lookback_window": 10,
+    "dueling": true,
+    "double": true,
+    "lstm": true,
+    "epsilon_eval": 0.05,
+    "ablations": [
+      {"name": "hoodie_no_lstm", "lstm": false},
+      {"name": "hoodie_no_dueling", "dueling": false},
+      {"name": "hoodie_no_double", "double": false}
+    ]
+  },
+  "baselines": [
+    {"name": "flc", "seed": 0},
+    {"name": "vo", "seed": 0},
+    {"name": "ho", "seed": 0},
+    {"name": "ro", "seed": 0},
+    {"name": "bco", "seed": 0},
+    {"name": "mleo", "seed": 0}
+  ],
+  "output": {
+    "artifacts_root": "experiments/hoodie_eval/artifacts"
+  }
+}
